@@ -1,0 +1,11 @@
+autocal_rc/Debug/
+x64/
+.vs/
+src/vc140.pdb
+*.obj
+*.ilk
+*.pdb
+venv/
+autocal_rc.aps
+required_files/
+associated_software/
