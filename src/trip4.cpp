@@ -555,37 +555,28 @@ bool CheckForCorrectTrip(HANDLE hTripUnit, int ExpectedTripType, bool &tripTypeI
 	return true;
 }
 
-bool GetSerialNumbers(
+bool GetSerialNumber(
 	HANDLE hTripUnit,
-	char *ld_serial_num, size_t size_buf_1,
-	char *tu_serial_num, size_t size_buf_2)
+	char *tu_serial_num, size_t buffer_size)
 {
 	_ASSERT(hTripUnit != INVALID_HANDLE_VALUE);
 
-	URCMessageUnion rsp1 = {0};
-	URCMessageUnion rsp2 = {0};
+	URCMessageUnion rsp = {0};
 
-	if (size_buf_1 != 12 || size_buf_2 != 12)
-		return false;
-
-	// ask LD for its serial num
-	if (!SendURCCommand(hTripUnit, MSG_GET_SER_NUM, ADDR_DISP_LOCAL, ADDR_CAL_APP))
-		return false;
-	if (!GetAckURCResponse(hTripUnit, &rsp1))
-		return false;
-	if (!VerifyMessageIsOK(&rsp1, MSG_RSP_SER_NUM, sizeof(MsgRspSerNum) - sizeof(MsgHdr)))
+	if (buffer_size != 12)
 		return false;
 
 	// ask TU for its serial num
 	if (!SendURCCommand(hTripUnit, MSG_GET_SER_NUM, ADDR_TRIP_UNIT, ADDR_CAL_APP))
 		return false;
-	if (!GetAckURCResponse(hTripUnit, &rsp2))
-		return false;
-	if (!VerifyMessageIsOK(&rsp1, MSG_RSP_SER_NUM, sizeof(MsgRspSerNum) - sizeof(MsgHdr)))
+
+	if (!GetAckURCResponse(hTripUnit, &rsp))
 		return false;
 
-	strcpy_s(ld_serial_num, size_buf_1, rsp1.msgRspSerNum.Number);
-	strcpy_s(tu_serial_num, size_buf_2, rsp2.msgRspSerNum.Number);
+	if (!VerifyMessageIsOK(&rsp, MSG_RSP_SER_NUM, sizeof(MsgRspSerNum) - sizeof(MsgHdr)))
+		return false;
+
+	strcpy_s(tu_serial_num, buffer_size, rsp.msgRspSerNum.Number);
 
 	return true;
 }
@@ -614,39 +605,22 @@ bool SendSetSerial(HANDLE hTripUnit, int dest, char *serial_num, HardVer hw_vers
 	return GetAckURCResponse(hTripUnit, &rsp) && (rsp.msgHdr.Type == MSG_ACK);
 }
 
-bool SetSerialNumbers(
-	HANDLE hTripUnit,
-	char *ld_serial_num,
-	char *tu_serial_num)
+bool SetSerialNumber(HANDLE hTripUnit, char *tu_serial_num)
 {
-
-	// start out by requesting the hardware revision, from both trip unit and LD
-
-	URCMessageUnion rsp1 = {0};
-	URCMessageUnion rsp2 = {0};
-
-	// ask TU for its hardware rev (since we need to send it back with MSG_SET_SER_NUM_4)
-	if (!SendURCCommand(hTripUnit, MSG_GET_HW_REV, ADDR_DISP_LOCAL, ADDR_CAL_APP))
-		return false;
-	if (!GetAckURCResponse(hTripUnit, &rsp1))
-		return false;
-	if (!VerifyMessageIsOK(&rsp1, MSG_RSP_HW_REV, sizeof(MsgRspHwRev) - sizeof(MsgHdr)))
-		return false;
+	URCMessageUnion rsp = {0};
 
 	// ask TU for its hardware rev (since we need to send it back with MSG_SET_SER_NUM_4)
 	if (!SendURCCommand(hTripUnit, MSG_GET_HW_REV, ADDR_TRIP_UNIT, ADDR_CAL_APP))
 		return false;
-	if (!GetAckURCResponse(hTripUnit, &rsp2))
+
+	if (!GetAckURCResponse(hTripUnit, &rsp))
 		return false;
-	if (!VerifyMessageIsOK(&rsp2, MSG_RSP_HW_REV, sizeof(MsgRspHwRev) - sizeof(MsgHdr)))
+
+	if (!VerifyMessageIsOK(&rsp, MSG_RSP_HW_REV, sizeof(MsgRspHwRev) - sizeof(MsgHdr)))
 		return false;
 
 	if (!SendSetSerial(hTripUnit,
-					   ADDR_DISP_LOCAL, ld_serial_num, rsp1.msgRspHwRev.HW))
-		return false;
-
-	if (!SendSetSerial(hTripUnit,
-					   ADDR_TRIP_UNIT, tu_serial_num, rsp2.msgRspHwRev.HW))
+					   ADDR_TRIP_UNIT, tu_serial_num, rsp.msgRspHwRev.HW))
 		return false;
 
 	return true;

@@ -36,8 +36,7 @@
 #undef UNICODE
 
 // 1.0 - original
-// 1.1 - first working r.c. calibration
-constexpr float AUTOCAL_RC_VERSION = 1.1;
+constexpr float AUTOCAL_RC_VERSION = 1.0;
 
 // private function prototypes
 bool ProgramTripUnitEEProm(const char *mfg, const char *description);
@@ -132,38 +131,11 @@ std::string ReadStringFromINIFile(
 
 void ReadInConfigurationFile()
 {
-	int tmpVal;
-
-	tmpVal = readIntValueFromINIFile(iniFile.c_str(), "comports", "TripUnit");
-	if (-1 != tmpVal)
-		hTripUnit.commPort = tmpVal;
-
-	tmpVal = readIntValueFromINIFile(iniFile.c_str(), "comports", "Keithley");
-	if (-1 != tmpVal)
-		hKeithley.commPort = tmpVal;
-
-	// TODO: add other ports later, once we start using them
-	ShouldAutoConnect = readBoolValueFromINIFile(iniFile.c_str(), "comports", "autoconnect");
-
 	database_file = ReadStringFromINIFile(iniFile.c_str(), "database", "file");
 }
 
 void WriteConfigurationFile()
 {
-
-	char tripUnit[255];
-	sprintf_s(tripUnit, sizeof(tripUnit), "%d", hTripUnit.commPort);
-	WritePrivateProfileStringA("comports", "TripUnit", tripUnit, iniFile.c_str());
-
-	char keithley[255];
-	sprintf_s(keithley, sizeof(keithley), "%d", hKeithley.commPort);
-	WritePrivateProfileStringA("comports", "Keithley", keithley, iniFile.c_str());
-
-	// Convert the boolean value to a string
-	const char *shouldAutoConnect = ShouldAutoConnect ? "true" : "false";
-	WritePrivateProfileStringA("comports", "autoconnect", shouldAutoConnect, iniFile.c_str());
-
-	// TODO: add other ports later, once we start using them
 }
 
 // everybody should call this to post a message saying to update the UI
@@ -258,29 +230,46 @@ bool ProgramTripUnitEEProm(const char *mfg, const char *description)
 	return retval;
 }
 
-void ProgramTripUnitSerialNumbers()
+bool ProgramTripUnitSerialNumber()
 {
-
 	HANDLE hHandleForTripUnit;
 
 	if (INVALID_HANDLE_VALUE == (hHandleForTripUnit = GetHandleForTripUnit()))
 	{
 		PrintToScreen("Trip Unit not connected");
-		return;
+		return false;
 	}
 
-	if (strlen(ld_serial) != 10 || strlen(tu_serial) != 10)
+	if (strlen(tu_serial) != 10)
 	{
 		PrintToScreen("Serial numbers must be 10 characters long");
-		return;
+		return false;
 	}
 
-	if (SetSerialNumbers(hHandleForTripUnit, ld_serial, tu_serial))
+	if (!SetSerialNumber(hHandleForTripUnit, tu_serial))
 	{
-		PrintToScreen("Serial numbers set");
-	}
-	else
 		PrintToScreen("Failed to set serial numbers");
+		return false;
+	}
+
+	// read back the serial number
+
+	char new_tu_serial[12] = {0};
+
+	if (!GetSerialNumber(hHandleForTripUnit, new_tu_serial, sizeof(new_tu_serial)))
+	{
+		PrintToScreen("Failed to read back serial number");
+		return false;
+	}
+
+	if (strcmp(tu_serial, new_tu_serial) != 0)
+	{
+		PrintToScreen("Failed to verify serial numbers");
+		return false;
+	}
+
+	PrintToScreen("Trip Unit Serial number set to: " + std::string(tu_serial));
+	return true;
 }
 
 // returns true if "port" is not already open
@@ -297,27 +286,7 @@ static bool CommPortIsAvailable(int port)
 	return true;
 }
 
-// if comm ports are specified in the .INI file, then use them
-void ConnectViaKnownPorts()
-{
-	SetStatusBarText("Connecting to devices using known comm ports...");
-
-	if (hKeithley.commPort > 0)
-		if (KEITHLEY::Connect(&hKeithley.handle, hKeithley.commPort))
-			PrintToScreen("Connected to KEITHLEY on comm " + std::to_string(hKeithley.commPort));
-
-	if (hTripUnit.commPort > 0)
-		if (ConnectTripUnit(&hTripUnit.handle, hTripUnit.commPort, &tripUnitType))
-		{
-			PrintToScreen("Connected to TripUnit on comm " + std::to_string(hTripUnit.commPort));
-			PrintToScreen("Trip Unit type: " + TripUnitTypeToString(tripUnitType));
-		}
-
-	StatusBarReady();
-	return;
-}
-
-void FindATBKeithleyAndTripUnit(bool findKeithley, bool findTripUnit)
+void FindEquipment(bool findKeithley, bool findTripUnit, bool findArduino)
 {
 	SetStatusBarText("Searching for devices...");
 	EnumeratePorts();
@@ -371,37 +340,28 @@ void FindATBKeithleyAndTripUnit(bool findKeithley, bool findTripUnit)
 			PrintToScreen("Trip Unit not found");
 	}
 
-	PrintConnectionStatus();
-	StatusBarReady();
-}
-
-void FindArduino()
-{
-	SetStatusBarText("Searching for Arduino...");
-	EnumeratePorts();
-
-	hArduino.commPort = 0;
-
-	for (int i = 0; i < commPorts.size(); i++)
+	if (findArduino)
 	{
-		if (CommPortIsAvailable(commPorts[i]))
+		hArduino.commPort = 0;
+
+		for (int i = 0; i < commPorts.size(); i++)
 		{
-			PrintToScreen("searching for Arduino on com: " + std::to_string(commPorts[i]));
-			if (ARDUINO::Connect(&hArduino.handle, commPorts[i]))
+			if (CommPortIsAvailable(commPorts[i]))
 			{
-				hArduino.commPort = commPorts[i];
-				PrintToScreen("Arduino found on comm port " + std::to_string(commPorts[i]));
-				break;
-			}
-			else
-			{
-				CloseCommPort(&hArduino.handle);
+				PrintToScreen("searching for Arduino on com: " + std::to_string(commPorts[i]));
+				if (ARDUINO::Connect(&hArduino.handle, commPorts[i]))
+				{
+					hArduino.commPort = commPorts[i];
+					PrintToScreen("Arduino found on comm port " + std::to_string(commPorts[i]));
+					break;
+				}
+				else
+				{
+					CloseCommPort(&hArduino.handle);
+				}
 			}
 		}
 	}
-
-	if (0 == hArduino.commPort)
-		PrintToScreen("Arduino not found");
 
 	PrintConnectionStatus();
 	StatusBarReady();
@@ -661,7 +621,6 @@ INT_PTR CALLBACK SerialNum_DlgProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
 	switch (message)
 	{
 	case WM_INITDIALOG:
-		SetDlgItemTextA(hwnd, IDC_LD_SERIAL, ld_serial);
 		SetDlgItemTextA(hwnd, IDC_TU_SERIAL, tu_serial);
 		SetFocus(GetDlgItem(hwnd, IDC_LD_SERIAL));
 		return false; // return false meaning we set the focus ourselves
@@ -670,9 +629,11 @@ INT_PTR CALLBACK SerialNum_DlgProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
 		{
 		case IDOK:
 		{
-			GetDlgItemTextA(hwnd, IDC_LD_SERIAL, ld_serial, sizeof(ld_serial));
 			GetDlgItemTextA(hwnd, IDC_TU_SERIAL, tu_serial, sizeof(tu_serial));
-			ProgramTripUnitSerialNumbers();
+			if (!ProgramTripUnitSerialNumber())
+			{
+				MessageBoxA(hwnd, "Failed to program trip unit serial number", "Error", MB_ICONERROR);
+			}
 			EndDialog(hwnd, 0);
 			return TRUE;
 		}
@@ -1371,7 +1332,6 @@ static void Async_FullACPro2_RG()
 
 	std::thread thread(ACPRO2_RG::DoFullTripUnitCAL, hHandleForTripUnit, hKeithley.handle, fullRCCalibrationParams);
 	thread.detach();
-
 }
 
 // enumerate available comm ports by querying registry
@@ -1870,8 +1830,8 @@ static void menu_ID_CONNECTION_FIND_KEITHLEY()
 		PrintToScreen("Keithley already connected; please disconnect first");
 		return;
 	}
-	// FIX std::thread thread(FindATBKeithleyAndTripUnit, true, false, false);
-	// FIX thread.detach();
+	std::thread thread(FindEquipment, true, false, false);
+	thread.detach();
 }
 
 static void menu_ID_CONNECTION_CONNECT_RIGOL_DG1000Z()
@@ -1933,8 +1893,8 @@ static void menu_ID_CONNECTION_FIND_TRIPUNIT()
 		return;
 	}
 
-	// FIX std::thread thread(FindATBKeithleyAndTripUnit, false, false, true);
-	// FIX thread.detach();
+	std::thread thread(FindEquipment, false, true, false);
+	thread.detach();
 }
 
 // BK_PRECISION_9801 is a VISA device
@@ -1998,8 +1958,8 @@ static void menu_ID_CONNECTION_FIND_ARUINO()
 		return;
 	}
 
-	// FIX std::thread thread(FindArduino);
-	// FIX thread.detach();
+	std::thread thread(FindEquipment, false, false, true);
+	thread.detach();
 }
 
 static void menu_ID_CONNECTION_ENUMERATECOMMPORTS()
@@ -2012,37 +1972,11 @@ static void menu_ID_CONNECTION_PRINTCONNECTIONSTATUS()
 	PrintConnectionStatus();
 }
 
-static void menu_ID_FIND_DEVICES_1()
-{
-	bool findKeithley = true;
-	bool findATB = true;
-	bool findTripUnit = true;
-
-	if (hKeithley.handle != INVALID_HANDLE_VALUE)
-	{
-		PrintToScreen("Keithley already connected; skipping...");
-		findKeithley = false;
-	}
-
-	if (hTripUnit.handle != INVALID_HANDLE_VALUE)
-	{
-		PrintToScreen("Trip Unit already connected; skipping");
-		findTripUnit = false;
-	}
-
-	if (findKeithley || findATB || findTripUnit)
-	{
-		// FIX std::thread thread(FindATBKeithleyAndTripUnit, findKeithley, findATB, findTripUnit);
-		// FIX thread.detach();
-	}
-	else
-		PrintToScreen("Keithley, ATB, and Trip Unit already connected");
-}
-
 static void menu_ID_FIND_DEVICES_2()
 {
 	bool findKeithley = true;
 	bool findTripUnit = true;
+	bool findArduino = true;
 
 	if (hKeithley.handle != INVALID_HANDLE_VALUE)
 	{
@@ -2054,17 +1988,23 @@ static void menu_ID_FIND_DEVICES_2()
 	{
 		PrintToScreen("Trip Unit already connected; skipping");
 		findTripUnit = false;
+	}
+
+	if (hArduino.handle != INVALID_HANDLE_VALUE)
+	{
+		PrintToScreen("Arduino already connected; skipping");
+		findArduino = false;
 	}
 
 	if (!RIGOL_DG1000Z_Connected)
 		menu_ID_CONNECTION_CONNECT_RIGOL_DG1000Z();
 	else
-		PrintToScreen("RIGOL_DG1000Z already connectedl skipping...");
+		PrintToScreen("RIGOL_DG1000Z already connected skipping...");
 
-	if (findKeithley || findTripUnit)
+	if (findKeithley || findTripUnit || findArduino)
 	{
-		// FIX std::thread thread(FindATBKeithleyAndTripUnit, findKeithley, false, findTripUnit);
-		// FIX thread.detach();
+		std::thread thread(FindEquipment, findKeithley, findTripUnit, findArduino);
+		thread.detach();
 	}
 	else
 	{
@@ -2676,8 +2616,8 @@ static void menu_ID_RC_ARBITRARY_CAL()
 		return;
 	}
 
-	// FIX std::thread thread(DoAsyncArbitraryCal, hHandleForTripUnit, hKeithley.handle);
-	// FIX thread.detach();
+	std::thread thread(DoAsyncArbitraryCal, hHandleForTripUnit, hKeithley.handle);
+	thread.detach();
 }
 
 static void menu_ID_ACPro2_GET_MSG_GET_CAL()
@@ -3736,6 +3676,8 @@ void AsyncArduinoTripTest_Generic()
 
 	ArduinoAbortTimingTest = false;
 
+	int retryCount = 0;
+
 	while (!ArduinoAbortTimingTest)
 	{
 		Sleep(200);
@@ -3759,6 +3701,7 @@ void AsyncArduinoTripTest_Generic()
 
 		if (retval)
 		{
+			retryCount = 0;
 			// check to see if the timing tests are valid yet...
 			msgRspTimingTestResults = reinterpret_cast<ARDUINO::MsgRspTimingTestResults *>(&rsp);
 			if (msgRspTimingTestResults->timingTestResults.ResultsAreValid)
@@ -3767,7 +3710,11 @@ void AsyncArduinoTripTest_Generic()
 		else
 		{
 			PrintToScreen("cannot get timing results from the Arduino");
-			return;
+			if (retryCount++ == 3)
+			{
+				PrintToScreen("aborting....");
+				return;
+			}
 		}
 	}
 
@@ -3833,9 +3780,9 @@ static void menu_ID_ARDUINO_RUNTEST_LT()
 	float DesiredAmps = ReturnedInputValue_Float;
 
 	// this is the version of the arduino test using the RIGOL
-	// FIX std::thread thread(
-	// FIX 	AsyncArduinoTripTest_LT, LTPickupValue, LT_Delay_Seconds, DesiredAmps);
-	// FIX thread.detach();
+	std::thread thread(
+		AsyncArduinoTripTest_LT, LTPickupValue, LT_Delay_Seconds, DesiredAmps);
+	thread.detach();
 }
 
 static void menu_ID_ARDUINO_RUNTEST_INST()
@@ -4128,8 +4075,8 @@ static void menu_ID_ARDUINO_RUNTEST_MULTI_LT()
 		return;
 	}
 
-	// FIX std::thread thread(AsyncArduinoTripTest_Multi_LT, params);
-	// FIX thread.detach();
+	std::thread thread(AsyncArduinoTripTest_Multi_LT, params);
+	thread.detach();
 }
 
 static void menu_ID_ARDUINO_RUNTEST_MULTI_ST()
@@ -4175,8 +4122,8 @@ static void menu_ID_ARDUINO_RUNTEST_MULTI_ST()
 		return;
 	}
 
-	// FIX std::thread thread(AsyncArduinoTripTest_Multi_ST, params);
-	// FIX thread.detach();
+	std::thread thread(AsyncArduinoTripTest_Multi_ST, params);
+	thread.detach();
 }
 
 static void menu_ID_ARDUINO_RUNTEST_MULTI_INST()
@@ -4227,8 +4174,8 @@ static void menu_ID_ARDUINO_RUNTEST_MULTI_INST()
 	for (auto &param : params)
 		param.tripTimeThresholdMS = 50; // hard-coded value
 
-	// FIX std::thread thread(AsyncArduinoTripTest_Multi_INST, params);
-	// FIX thread.detach();
+	std::thread thread(AsyncArduinoTripTest_Multi_INST, params);
+	thread.detach();
 }
 
 static void menu_ID_ARDUINO_RUNTEST_MULTI_GF()
@@ -4308,8 +4255,8 @@ static void menu_ID_ARDUINO_GENERIC()
 		return;
 	}
 
-	// FIX std::thread thread(AsyncArduinoTripTest_Generic);
-	// FIX thread.detach();
+	std::thread thread(AsyncArduinoTripTest_Generic);
+	thread.detach();
 }
 
 static void menu_ID_ARDUINO_ABORT_TIMING()
@@ -4476,9 +4423,8 @@ static void menu_ID_ACPRO2_PROGRAM_SERIAL_NUMBERS()
 	}
 
 	// grab existing serial numbers into global variables
-	if (!GetSerialNumbers(
+	if (!GetSerialNumber(
 			hHandleForTripUnit,
-			ld_serial, sizeof(ld_serial),
 			tu_serial, sizeof(tu_serial)))
 	{
 		PrintToScreen("Error getting serial numbers from TU/LD");
@@ -4683,8 +4629,8 @@ static void menu_ID_RC_STEP_RIGOL_DG1000Z(bool Use50hz)
 
 	MessageBoxA(hwndMain, "Make Sure trip unit frequency is set to match the frequency you've selected!", "Step Test", MB_OK);
 
-	// FIX std::thread thread(stepRIGOL, hHandleForTripUnit, hKeithley.handle, Use50hz);
-	// FIX thread.detach();
+	std::thread thread(stepRIGOL, hHandleForTripUnit, hKeithley.handle, Use50hz);
+	thread.detach();
 }
 
 static void menu_ID_RC_STEP_BK9801(bool Use50hz)
@@ -5131,10 +5077,6 @@ static void processCommands(HWND hwnd, WPARAM wParam)
 
 	case ID_CONNECTION_PRINTCONNECTIONSTATUS:
 		menu_ID_CONNECTION_PRINTCONNECTIONSTATUS();
-		break;
-
-	case ID_FIND_DEVICES_1:
-		menu_ID_FIND_DEVICES_1();
 		break;
 
 	case ID_FIND_DEVICES_2:
@@ -5631,22 +5573,9 @@ void Initialize()
 	PrintToScreen("AutoCal_RC " + FloatToString(AUTOCAL_RC_VERSION, 1));
 	std::string buildDate = "Binary build date: " + std::string(__DATE__) + " @ " + std::string(__TIME__);
 	PrintToScreen(buildDate);
-	PrintToScreen("*** for engineering use only **** ");
 
 	CheckForRequiredPaths();
-
 	ReadInConfigurationFile();
-
-	// based on what is in the configuration file, we will try to connect to the devices
-	if (ShouldAutoConnect)
-	{
-		ConnectViaKnownPorts();
-
-		// we don't connect to VISA devices automatically...
-
-		// let the user know what we connected to
-		PrintConnectionStatus();
-	}
 
 	if (DB::Connect(database_file))
 		PrintToScreen("Successfully connected to database: " + database_file);

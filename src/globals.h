@@ -74,10 +74,7 @@ enum ConnectionEnum
 	DEVICE_KEITHLEY
 };
 
-char ld_serial[12] = {0};
 char tu_serial[12] = {0};
-
-bool ShouldAutoConnect = false;
 
 std::string database_file;
 
@@ -85,4 +82,4 @@ ACPRO2_RG::ArbitraryCalibrationParams arbitraryRCCalibrationParams;
 ACPRO2_RG::FullCalibrationParams fullRCCalibrationParams;
 
 // we have already made sure this directory exists
-std::string iniFile = "C:\\urc\\apps\\autocal_lite\\autocal_lite.ini";
+std::string iniFile = "C:\\urc\\apps\\autocal_rc\\autocal_rc.ini";
