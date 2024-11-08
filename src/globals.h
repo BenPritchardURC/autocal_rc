@@ -61,10 +61,11 @@ std::string ReturnedInputValue_String;
 
 ////////////////////////////////////////////////////////////////////////////
 
-HWND hwndMain;
-HWND hwndEdit;
-HWND hwndStatusBar;
-HWND hwndManualModeDialog;
+HWND hwndMain = NULL;
+HWND hwndEdit = NULL;
+HWND hwndStatusBar = NULL;
+HWND hwndManualModeDialog = NULL;
+HWND hModelessDlg = NULL;
 
 int ATB_Phase_Selected = -1;
 long double rValue_For_ATB_Phase;
@@ -83,6 +84,8 @@ std::string database_file;
 
 ACPRO2_RG::ArbitraryCalibrationParams arbitraryRCCalibrationParams;
 ACPRO2_RG::FullCalibrationParams fullRCCalibrationParams;
+
+bool ProductionMode = false;
 
 // we have already made sure this directory exists
 std::string iniFile = "C:\\urc\\apps\\autocal_rc\\autocal_rc.ini";

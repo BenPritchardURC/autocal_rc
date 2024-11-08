@@ -1880,10 +1880,7 @@ static void menu_ID_CONNECTION_CONNECT_TRIPUNIT()
 
 static void menu_ID_CONNECTION_DISCONNECT_TRIPUNIT()
 {
-	CloseCommPort(&hTripUnit.handle);
-	PrintToScreen("Disconnected from Trip Unit");
-	tripUnitType = TripUnitType::NONE;
-	PrintConnectionStatus();
+	DisconnectFromTripUnit();
 }
 
 static void menu_ID_CONNECTION_FIND_TRIPUNIT()
@@ -4993,6 +4990,27 @@ static void menu_ID_RC_BK9801_DRIFT_TEST()
 	doBK9801_DriftTest(hHandleForTripUnit, hKeithley.handle);
 }
 
+static void LaunchProductionLoop()
+{
+	std::thread thread(ACPRO2_RG::DoProductionLoop);
+	thread.detach();
+}
+
+void ShowModelessDialog(HWND hwndParent, LPCTSTR text)
+{
+	if (hModelessDlg == NULL)
+	{
+		hModelessDlg =
+			CreateDialogParam(
+				GetModuleHandle(NULL),
+				MAKEINTRESOURCE(IDD_CUSTOM_DIALOG),
+				hwndParent,
+				ACPRO2_RG::ProductionDialogProc, (LPARAM)text);
+		EnableWindow(hwndParent, FALSE); // Disable the parent window
+		ShowWindow(hModelessDlg, SW_SHOW);
+	}
+}
+
 static void processCommands(HWND hwnd, WPARAM wParam)
 {
 	MSG msg = {0};
@@ -5082,6 +5100,17 @@ static void processCommands(HWND hwnd, WPARAM wParam)
 
 	case ID_FIND_DEVICES_2:
 		menu_ID_FIND_DEVICES_2();
+		break;
+
+		//////////////////////////////////////////////////////
+		// Production
+		//////////////////////////////////////////////////////
+
+	case ID_PRODUCTION_LOOP:
+		// note: this has to be done from this thread i think
+		ShowModelessDialog(hwnd, "");
+		// launch the production loop as a separate thread
+		LaunchProductionLoop();
 		break;
 
 		//////////////////////////////////////////////////////
@@ -5410,6 +5439,14 @@ static void FindTripUnitWhenConnected()
 {
 	std::thread thread(FindEquipment, false, true, false);
 	thread.detach();
+}
+
+void DisconnectFromTripUnit()
+{
+	CloseCommPort(&hTripUnit.handle);
+	PrintToScreen("Disconnected from Trip Unit");
+	tripUnitType = TripUnitType::NONE;
+	PrintConnectionStatus();
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)

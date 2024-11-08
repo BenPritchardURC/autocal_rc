@@ -12,3 +12,9 @@
  *******************************************************************************/
 
 #pragma once
+
+namespace ACPRO2_RG
+{
+    void DoProductionLoop();
+    LRESULT CALLBACK ProductionDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+}

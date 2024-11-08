@@ -40,3 +40,5 @@ void PrintToScreen(const std::string &message);
 void scr_printf(const char *format, ...);
 static void menu_ID_ACPRO2_PRINT_VERSION();
 static void menu_ID_ARDUINO_PRINTVERSION();
+void PrintConnectionStatus();
+void DisconnectFromTripUnit();
