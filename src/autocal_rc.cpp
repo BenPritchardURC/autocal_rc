@@ -13,6 +13,7 @@
 
 #include "autocal_rc.hpp"
 #include "resource\resource.h"
+#include "Dbt.h"
 
 #include <CommCtrl.h>
 #include <vector>
@@ -5381,7 +5382,7 @@ void CreateFontForEditBox()
 	SendMessage(hwndEdit, WM_SETFONT, (WPARAM)hfont, TRUE);
 }
 
-// sets up a long status bar, with 3 short sections on the far right
+// sets up a long status bar, with 4 short sections on the far right
 void ResizeStatusBarSections()
 {
 	// Get the width of the status bar.
@@ -5390,16 +5391,25 @@ void ResizeStatusBarSections()
 	int statusBarWidth = rcStatusBar.right - rcStatusBar.left;
 
 	int smallPartWidth = 100;
-	int longPartWidth = statusBarWidth - 3 * smallPartWidth;
+	int longPartWidth = statusBarWidth - 4 * smallPartWidth;
 
 	// Set the locations of the far right edge of all the sections
 	int partsWidths[] = {
 		longPartWidth,
 		longPartWidth + smallPartWidth * 1,
 		longPartWidth + smallPartWidth * 2,
-		longPartWidth + smallPartWidth * 3};
+		longPartWidth + smallPartWidth * 3,
+		longPartWidth + smallPartWidth * 4};
 
 	SendMessage(hwndStatusBar, SB_SETPARTS, sizeof(partsWidths) / sizeof(int), (LPARAM)partsWidths);
+}
+
+static bool isTimerSet = false;
+
+static void FindTripUnitWhenConnected()
+{
+	std::thread thread(FindEquipment, false, true, false);
+	thread.detach();
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -5411,6 +5421,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 	switch (msg)
 	{
+	case WM_DEVICECHANGE:
+		if (wParam == DBT_DEVICEARRIVAL)
+		{
+			PrintToScreen("WM_DEVICECHANGE");
+
+			if (!isTimerSet)
+			{
+				// setup timer for 5 seconds from now to find trip unit
+				SetTimer(hwnd, ID_TIMER_2, 5000, NULL);
+				isTimerSet = true;
+			}
+		}
+		break;
 	case WM_CREATE:
 
 		// create an edit control
@@ -5453,14 +5476,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		// update screen to show connection status
 		switch (wParam)
 		{
-		case ID_TIMER:
+		case ID_TIMER_1:
 			SetConnectionStatus(ConnectionEnum::DEVICE_TRIP_UNIT, hTripUnit.handle != INVALID_HANDLE_VALUE);
 			SetConnectionStatus(ConnectionEnum::DEVICE_KEITHLEY, hKeithley.handle != INVALID_HANDLE_VALUE);
+			SetConnectionStatus(ConnectionEnum::DEVICE_ARDUINO, hArduino.handle != INVALID_HANDLE_VALUE);
+			SetConnectionStatus(ConnectionEnum::DEVICE_RIGOL, RIGOL_DG1000Z_Connected);
+			break;
 
+		case ID_TIMER_2:
+			KillTimer(hwnd, ID_TIMER_2);
+			FindTripUnitWhenConnected();
+			isTimerSet = false;
 			break;
 		}
 		break;
-		// Handle other messages here
 
 	case WM_SIZE:
 		// Make the edit control the size of the window's client area.
@@ -5538,7 +5567,21 @@ void SetConnectionStatus(ConnectionEnum connection, bool isConnected)
 		break;
 	case ConnectionEnum::DEVICE_KEITHLEY:
 		message_to_send = "Keithley: " + connection_string;
+		SendMessage(hwndStatusBar, SB_SETTEXT, 2, (LPARAM)message_to_send.c_str());
+		// tell status bar to repaint
+		InvalidateRect(hwndStatusBar, NULL, TRUE);
+		SendMessage(hwndStatusBar, WM_PAINT, 0, 0);
+		break;
+	case ConnectionEnum::DEVICE_RIGOL:
+		message_to_send = "Rigol: " + connection_string;
 		SendMessage(hwndStatusBar, SB_SETTEXT, 3, (LPARAM)message_to_send.c_str());
+		// tell status bar to repaint
+		InvalidateRect(hwndStatusBar, NULL, TRUE);
+		SendMessage(hwndStatusBar, WM_PAINT, 0, 0);
+		break;
+	case ConnectionEnum::DEVICE_ARDUINO:
+		message_to_send = "Arduino: " + connection_string;
+		SendMessage(hwndStatusBar, SB_SETTEXT, 4, (LPARAM)message_to_send.c_str());
 		// tell status bar to repaint
 		InvalidateRect(hwndStatusBar, NULL, TRUE);
 		SendMessage(hwndStatusBar, WM_PAINT, 0, 0);
@@ -5660,12 +5703,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	// tell OS to send us a timer message every 5 seconds
 	// (currently this is used to update the status bar)
 	SetTimer(hwndMain,
-			 ID_TIMER,
+			 ID_TIMER_1,
 			 5000,
 			 NULL);
 
 	SetConnectionStatus(ConnectionEnum::DEVICE_TRIP_UNIT, false);
 	SetConnectionStatus(ConnectionEnum::DEVICE_KEITHLEY, false);
+	SetConnectionStatus(ConnectionEnum::DEVICE_ARDUINO, false);
+	SetConnectionStatus(ConnectionEnum::DEVICE_RIGOL, false);
 
 	while (GetMessage(&Msg, NULL, 0, 0) > 0)
 	{

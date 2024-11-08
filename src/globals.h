@@ -20,7 +20,8 @@
 
 #define ID_EDITCHILD 100
 #define ID_TOOL_BAR 101
-#define ID_TIMER 1
+#define ID_TIMER_1 1
+#define ID_TIMER_2 2 //
 
 const char g_szClassName[] = "urc_autocal_lite";
 
@@ -71,7 +72,9 @@ long double rValue_For_ATB_Phase;
 enum ConnectionEnum
 {
 	DEVICE_TRIP_UNIT,
-	DEVICE_KEITHLEY
+	DEVICE_KEITHLEY,
+	DEVICE_RIGOL,
+	DEVICE_ARDUINO
 };
 
 char tu_serial[12] = {0};
