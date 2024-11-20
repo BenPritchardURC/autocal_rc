@@ -326,21 +326,21 @@ void DumpCalResults(MsgRspCalibr *msg)
 
 		if (0 == hz_index)
 		{
-			scr_printf("50hz");
+			PrintToScreen("50hz");
 			cal_ptr = &msg->CalibrationDataInfoC.Hz50;
 		}
 		else
 		{
-			scr_printf("60hz");
+			PrintToScreen("60hz");
 			cal_ptr = &msg->CalibrationDataInfoC.Hz60;
 		}
 
-		scr_printf("calibrated channeles: %d", cal_ptr->CalibratedChannels);
+		PrintToScreen("calibrated channeles: " + cal_ptr->CalibratedChannels);
 
 		for (int i = 0; i < _NUM_A2D_INPUTS_RAW_CAL; i++)
 		{
-			scr_printf("%d offset... %d", i, cal_ptr->Offset[i]);
-			scr_printf("%d gain..... %d", i, cal_ptr->SwGain[i]);
+			PrintToScreen(std::to_string(i) + " offset... " + std::to_string(cal_ptr->Offset[i]));
+			PrintToScreen(std::to_string(i) + " gain..... " + std::to_string(cal_ptr->SwGain[i]));
 		}
 	}
 }
@@ -349,7 +349,7 @@ void DumpCalResults_RC(MsgRspCalibrRC *msg)
 {
 	CalibrationDataAtFrequencyRC *cal_ptr;
 
-	scr_printf("calibrated: %d", msg->CalibrationDataInfoD.Calibrated);
+	PrintToScreen("calibrated: " + std::to_string(msg->CalibrationDataInfoD.Calibrated));
 
 	for (int hi_gain_channel = 0; hi_gain_channel < _NUM_HI_GAIN; hi_gain_channel++)
 	{
@@ -357,16 +357,16 @@ void DumpCalResults_RC(MsgRspCalibrRC *msg)
 		switch (hi_gain_channel)
 		{
 		case 0:
-			scr_printf("HI_GAIN_0_5");
+			PrintToScreen("HI_GAIN_0_5");
 			break;
 		case 1:
-			scr_printf("HI_GAIN_1_0");
+			PrintToScreen("HI_GAIN_1_0");
 			break;
 		case 2:
-			scr_printf("HI_GAIN_1_5");
+			PrintToScreen("HI_GAIN_1_5");
 			break;
 		case 3:
-			scr_printf("HI_GAIN_2_0");
+			PrintToScreen("HI_GAIN_2_0");
 			break;
 		}
 
@@ -375,21 +375,21 @@ void DumpCalResults_RC(MsgRspCalibrRC *msg)
 
 			if (0 == hz_index)
 			{
-				scr_printf("50hz");
+				PrintToScreen("50hz");
 				cal_ptr = &msg->CalibrationDataInfoD.GainHI[hi_gain_channel].Hz50;
 			}
 			else
 			{
-				scr_printf("60hz");
+				PrintToScreen("60hz");
 				cal_ptr = &msg->CalibrationDataInfoD.GainHI[hi_gain_channel].Hz60;
 			}
 
-			scr_printf("calibrated channels: %d", cal_ptr->CalibratedChannels);
+			PrintToScreen("calibrated channels: " + std::to_string(cal_ptr->CalibratedChannels));
 
 			for (int i = 0; i < _NUM_TO_CALIBRATE_RC; i++)
 			{
-				scr_printf("%d offset... %d", i, cal_ptr->Offset[i]);
-				scr_printf("%d gain..... %d", i, cal_ptr->SwGain[i]);
+				PrintToScreen(std::to_string(i) + " offset... " + std::to_string(cal_ptr->Offset[i]));
+				PrintToScreen(std::to_string(i) + " gain..... " + std::to_string(cal_ptr->SwGain[i]));
 			}
 		}
 	}

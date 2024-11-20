@@ -19,7 +19,7 @@ extern TripUnitType tripUnitType;
 // the code in here is specific to the ACPRO2-RC trip unit
 namespace ACPRO2_RG
 {
-	static std::ofstream cal_file;
+	// static std::ofstream cal_file;
 
 	void WriteArbitraryCalibrationParamsToINI(const std::string INIFileName, const ArbitraryCalibrationParams &params)
 	{
@@ -259,6 +259,8 @@ namespace ACPRO2_RG
 		if (Use50Hz)
 			funcptr = [](SystemSettings4 *Settings, DeviceSettings4 *DevSettings4)
 			{
+				// this is a temporary thing... to make sure the trip unit won't trip
+				DevSettings4->ModbusForcedTripEnabled = false;
 				Settings->Frequency = 50;
 				return true;
 			};
@@ -266,6 +268,8 @@ namespace ACPRO2_RG
 		else
 			funcptr = [](SystemSettings4 *Settings, DeviceSettings4 *DevSettings4)
 			{
+				// this is a temporary thing... to make sure the trip unit won't trip
+				DevSettings4->ModbusForcedTripEnabled = false;
 				Settings->Frequency = 60;
 				return true;
 			};
@@ -351,8 +355,8 @@ namespace ACPRO2_RG
 
 	static void OutputDataPoint(std::string s)
 	{
-		cal_file.write(s.c_str(), s.size());
-		cal_file.write("\r\n", 2);
+		// cal_file.write(s.c_str(), s.size());
+		// cal_file.write("\r\n", 2);
 	}
 
 	static bool CalibrateOneGain(
@@ -425,9 +429,9 @@ namespace ACPRO2_RG
 			PrintToScreen("keithley voltage: " + std::to_string(KeithleyReadingVoltsRMS));
 			PrintToScreen("keithley voltage * 3800 = " + std::to_string(RMSCurrentToCalibrateTo));
 
-			OutputDataPoint(voltsRMS_as_string);
-			OutputDataPoint(std::to_string(KeithleyReadingVoltsRMS));
-			OutputDataPoint(std::to_string(RMSCurrentToCalibrateTo));
+			// OutputDataPoint(voltsRMS_as_string);
+			// OutputDataPoint(std::to_string(KeithleyReadingVoltsRMS));
+			// OutputDataPoint(std::to_string(RMSCurrentToCalibrateTo));
 
 			// calibrate all channels
 			calRequest = {0};
@@ -478,6 +482,7 @@ namespace ACPRO2_RG
 
 			DumpCalibrationResults(&calResults);
 
+			/*
 			OutputDataPoint(std::to_string(calResults.Offset[0]));
 			OutputDataPoint(std::to_string(calResults.SwGain[0]));
 			OutputDataPoint(std::to_string(calResults.RmsVal[0]));
@@ -495,6 +500,7 @@ namespace ACPRO2_RG
 			OutputDataPoint(std::to_string(calResults.RmsVal[6]));
 
 			OutputDataPoint(std::to_string(durationMS));
+			*/
 
 			// we should have high gains calibrated successfully for a,b,c,n
 			// (1 + 4 + 16 + 64 = 85)
@@ -541,9 +547,11 @@ namespace ACPRO2_RG
 			PrintToScreen("keithley voltage: " + std::to_string(KeithleyReadingVoltsRMS));
 			PrintToScreen("keithley voltage * 3800 = " + std::to_string(RMSCurrentToCalibrateTo));
 
+			/*
 			OutputDataPoint(voltsRMS_as_string);
 			OutputDataPoint(std::to_string(KeithleyReadingVoltsRMS));
 			OutputDataPoint(std::to_string(RMSCurrentToCalibrateTo));
+			*/
 
 			// calibrate all channels
 			calRequest = {0};
@@ -594,6 +602,8 @@ namespace ACPRO2_RG
 
 			DumpCalibrationResults(&calResults);
 
+			/*
+
 			OutputDataPoint(std::to_string(calResults.Offset[1]));
 			OutputDataPoint(std::to_string(calResults.SwGain[1]));
 			OutputDataPoint(std::to_string(calResults.RmsVal[1]));
@@ -611,6 +621,7 @@ namespace ACPRO2_RG
 			OutputDataPoint(std::to_string(calResults.RmsVal[7]));
 
 			OutputDataPoint(std::to_string(durationMS));
+			*/
 
 			retval = calResults.CalibratedChannels == 255;
 
@@ -821,7 +832,7 @@ namespace ACPRO2_RG
 
 		auto start = std::chrono::high_resolution_clock::now();
 
-		cal_file.open("c:\\tmp\\cal.tmp", std::ios::out | std::ios::binary);
+		// cal_file.open("c:\\tmp\\cal.tmp", std::ios::out | std::ios::binary);
 
 		if (retval)
 		{
@@ -833,9 +844,6 @@ namespace ACPRO2_RG
 			}
 		}
 
-		// currently the R.C. trip unit reports being an NW
-
-		
 		// check trip unit version
 		if (retval)
 		{
@@ -843,7 +851,6 @@ namespace ACPRO2_RG
 			if (!retval)
 				PrintToScreen("cannot calibrate; only AC-PRO-2-RC trip units are supported");
 		}
-		
 
 		if (retval)
 		{
@@ -913,9 +920,7 @@ namespace ACPRO2_RG
 		if (retval)
 		{
 			PrintToScreen("ACPRO2-RC full calibration procedure completed successfully!");
-
-			// show final calibration results from trip unit
-			//GetCalibration(hTripUnit);
+			GetCalibration(hTripUnit);
 		}
 
 		auto end = std::chrono::high_resolution_clock::now();
@@ -923,7 +928,7 @@ namespace ACPRO2_RG
 
 		PrintToScreen("Total Calibration Time (milliseconds): " + std::to_string(duration));
 
-		cal_file.close();
+		// cal_file.close();
 
 		return retval;
 	}

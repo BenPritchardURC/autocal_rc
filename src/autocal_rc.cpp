@@ -57,8 +57,7 @@ static void stepBK9801(HANDLE hTripUnit, HANDLE hKeithley, bool do50hz);
 static void stepRIGOL(HANDLE hTripUnit, HANDLE hKeithley, bool do50hz);
 static void CenterDialog(HWND hwnd);
 
-// Strings used to build an ASCII screen.
-// extern char S1[32], S2[32], S3[32], S4[32], S5[32], S6[32];
+static std::ofstream log_file;
 
 bool ArduinoAbortTimingTest = false;
 
@@ -148,6 +147,13 @@ void PrintToScreen(const std::string &msg)
 	// Post the message to the UI thread
 	// The LPARAM will be a pointer to the dynamically allocated std::string
 	PostMessage(hwndMain, WM_CALIBRATION_UPDATE_MSG, 0, reinterpret_cast<LPARAM>(message));
+
+	// log everything we print to the screen to the log file as well
+	if (log_file.is_open())
+	{
+		log_file.write(msg.c_str(), msg.size());
+		log_file.write("\n", 1);
+	}
 }
 
 // prints out a message to our edit box, which is a scrollable list of all the
@@ -230,6 +236,42 @@ bool ProgramTripUnitEEProm(const char *mfg, const char *description)
 
 	return retval;
 }
+
+/*
+bool DumpFTDIEEprom(const char *mfg, const char *description)
+{
+
+	bool retval;
+
+	// first just close the comm port, so we can open it up with FT_Open()
+	CloseCommPort(&hTripUnit.handle);
+
+	TripUnitFTDIIndex = FTDI::FindTripUnitFTDIIndex(hTripUnit.commPort);
+	retval = (FTDI::NO_FTDI_INDEX != TripUnitFTDIIndex);
+
+	if (retval)
+	{
+		retval = (FTDI::ProgramEEPROM(mfg, description, TripUnitFTDIIndex));
+	}
+
+	if (retval)
+	{
+		// read back what we just wrote
+		// make sure it was programmed correctly
+		retval = FTDI::VerifyEEPROM(mfg, description, TripUnitFTDIIndex);
+
+		if (!retval)
+		{
+			PrintToScreen("EEPROM verification failed");
+		}
+	}
+
+	// now just reconnect to the trip unit via comm port, no matter what
+	retval = ConnectTripUnit(&hTripUnit.handle, hTripUnit.commPort, &tripUnitType);
+
+	return retval;
+}
+*/
 
 bool ProgramTripUnitSerialNumber()
 {
@@ -1291,8 +1333,23 @@ INT_PTR CALLBACK ManualCal_DlgProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
 	return FALSE;
 }
 
+// perform a full calibration procedure on a ACPRO2-RC trip unit
+bool LoopDoFullTripUnitCAL(
+	HANDLE hTripUnit, HANDLE hKeithley, const ACPRO2_RG::FullCalibrationParams &params)
+{
+	for (int i = 0; i < 32; i++)
+	{
+		PrintToScreen("Starting cal number: " + std::to_string(i + 1));
+		ACPRO2_RG::DoFullTripUnitCAL(hTripUnit, hKeithley, params);
+	}
+
+	return true;
+}
+
 // functions that start with Async_ execute the function in a separate thread
-static void Async_FullACPro2_RG()
+// NOTE: this has a parameter shouldDoLoopingCal that is normally set to false.
+// NOTE: it is there so we can do the calibration in a loop during development (to look for repeatability)
+static void Async_FullACPro2_RG(bool shouldDoLoopingCal)
 {
 	HANDLE hHandleForTripUnit;
 	int msgboxID;
@@ -1331,7 +1388,13 @@ static void Async_FullACPro2_RG()
 	fullRCCalibrationParams.doHighGain = true;
 	fullRCCalibrationParams.doLowGain = true;
 
-	std::thread thread(ACPRO2_RG::DoFullTripUnitCAL, hHandleForTripUnit, hKeithley.handle, fullRCCalibrationParams);
+	std::thread thread;
+
+	if (shouldDoLoopingCal)
+		thread = std::thread(LoopDoFullTripUnitCAL, hHandleForTripUnit, hKeithley.handle, fullRCCalibrationParams);
+	else
+		thread = std::thread(ACPRO2_RG::DoFullTripUnitCAL, hHandleForTripUnit, hKeithley.handle, fullRCCalibrationParams);
+
 	thread.detach();
 }
 
@@ -4291,6 +4354,18 @@ static void menu_ID_COMMANDS_PROGRAM_FTDI()
 	DialogBox(NULL, MAKEINTRESOURCE(ID_FTDI_POPUP), hwndMain, FTDI_DlgProc);
 }
 
+static void menu_ID_COMMANDS_DUMP_FTDI()
+{
+	// to program the FTDI, we need to be directly connected to the FTDI chip
+	if (hTripUnit.handle == INVALID_HANDLE_VALUE)
+	{
+		PrintToScreen("Trip Unit not connected");
+		return;
+	}
+
+	DialogBox(NULL, MAKEINTRESOURCE(ID_FTDI_POPUP), hwndMain, FTDI_DlgProc);
+}
+
 //////////////////////////////////////////////////////
 // ACPro2 menu
 //////////////////////////////////////////////////////
@@ -4544,7 +4619,7 @@ static void menu_ID_ACPRO2_SETTINGS_FROM_TXT()
 // ACPro2-RC menu
 //////////////////////////////////////////////////////
 
-static void menu_ID_RC_FULL_CAL()
+static void menu_ID_RC_FULL_CAL(bool shouldDoLoopingCal)
 {
 	HANDLE hHandleForTripUnit;
 
@@ -4599,8 +4674,7 @@ static void menu_ID_RC_FULL_CAL()
 		PrintToScreen("RIGOL_DG1000Z or BK_PRECISION_9801 must be selected");
 		return;
 	}
-
-	Async_FullACPro2_RG();
+	Async_FullACPro2_RG(shouldDoLoopingCal);
 }
 
 static void menu_ID_RC_STEP_RIGOL_DG1000Z(bool Use50hz)
@@ -5155,7 +5229,11 @@ static void processCommands(HWND hwnd, WPARAM wParam)
 		break;
 
 	case ID_RC_FULL_CAL:
-		menu_ID_RC_FULL_CAL();
+		menu_ID_RC_FULL_CAL(false);
+		break;
+
+	case ID_RC_FULL_CAL_LOOP:
+		menu_ID_RC_FULL_CAL(true);
 		break;
 
 		// test routines
@@ -5390,6 +5468,13 @@ static void processCommands(HWND hwnd, WPARAM wParam)
 	case ID_COMMANDS_PROGRAM_FTDI:
 		menu_ID_COMMANDS_PROGRAM_FTDI();
 		break;
+
+		/*
+
+	case ID_COMMANDS_DUMP_FTDI:
+		menu_ID_COMMANDS_DUMP_FTDI();
+
+		*/
 
 		//////////////////////////////////////////////////////
 		// help menu
@@ -5648,6 +5733,19 @@ void CheckForRequiredPaths()
 	CheckForDir("C:\\urc\\apps\\autocal_rc\\");
 }
 
+bool OpenLogFile()
+{
+	// TODO: base log file name on current date/time
+	std::string logFileName = "C:\\urc\\apps\\autocal_rc\\autocal_rc.log";
+	log_file.open(logFileName, std::ios::out | std::ios::app);
+	if (!log_file.is_open())
+	{
+		PrintToScreen("Error opening log file: " + logFileName);
+		return false;
+	}
+	return true;
+}
+
 void Initialize()
 {
 	PrintToScreen("AutoCal_RC " + FloatToString(AUTOCAL_RC_VERSION, 1));
@@ -5661,6 +5759,12 @@ void Initialize()
 		PrintToScreen("Successfully connected to database: " + database_file);
 	else
 		PrintToScreen("*** ERROR*** cannot open database: " + database_file);
+
+	if (!OpenLogFile())
+	{
+		PrintToScreen("Error opening log file");
+		return;
+	}
 }
 
 HWND CreateStatusBar(HWND hwndParent, int idStatus, HINSTANCE hinst, int cParts)
