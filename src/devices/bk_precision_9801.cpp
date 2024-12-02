@@ -54,7 +54,7 @@ Before connecting, please make sure the USBTMC communication setting is enabled 
 
 namespace BK_PRECISION_9801
 {
-    constexpr int BK_9801_MAX_VOLTS_RMS = 30;
+    constexpr int BK_9801_MAX_VOLTS_RMS = 300;
 
     // default time of 5 seconds to wait for a response from the instrument
     ViUInt32 timeout_ms = 5000;
@@ -212,13 +212,17 @@ namespace BK_PRECISION_9801
         std::string expected_string_back;
         std::string actual_string_back;
 
+        // convert voltsRMSAsString to a double
+        double voltsRMS = std::stod(voltsRMSAsString);
+
         retval = true;
 
         // check to make sure RMS is less than or equal to 30vRMS
         if (retval)
         {
-            // convert voltsRMSAsString to a double
-            double voltsRMS = std::stod(voltsRMSAsString);
+            // this code is setup to be on the other side of an attenuation network
+            // that scales the voltage down
+            voltsRMS *= 7.930951;
 
             // verify is less than BK_9801_MAX_VOLTS_RMS
             if (voltsRMS > BK_9801_MAX_VOLTS_RMS)
@@ -239,10 +243,18 @@ namespace BK_PRECISION_9801
             retval = WriteCommand(cmd_to_apply);
         }
 
+        if (retval)
+        {
+            // maybe we need a certain amount of time between commands??
+            Sleep(1000);
+        }
+
         // set voltage
         if (retval)
         {
-            cmd_to_apply = ":SOUR:VOLT " + voltsRMSAsString;
+            // convert back to string after scaling up
+            std::string scaledVoltsRMSAsString = std::to_string(voltsRMS);
+            cmd_to_apply = ":SOUR:VOLT " + scaledVoltsRMSAsString;
             retval = WriteCommand(cmd_to_apply);
         }
 

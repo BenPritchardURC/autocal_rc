@@ -42,3 +42,5 @@ static void menu_ID_ACPRO2_PRINT_VERSION();
 static void menu_ID_ARDUINO_PRINTVERSION();
 void PrintConnectionStatus();
 void DisconnectFromTripUnit();
+static void stepVoltageSource(HANDLE hTripUnit, HANDLE hKeithley, bool use_bk_precision_9801_not_rigol_dg1000z, bool do50hz);
+static void TurnOffVoltageSource(bool use_bk_precision_9801_not_rigol_dg1000z);

@@ -1340,8 +1340,13 @@ bool LoopDoFullTripUnitCAL(
 	for (int i = 0; i < 32; i++)
 	{
 		PrintToScreen("Starting cal number: " + std::to_string(i + 1));
-		ACPRO2_RG::DoFullTripUnitCAL(hTripUnit, hKeithley, params);
+		// ACPRO2_RG::DoFullTripUnitCAL(hTripUnit, hKeithley, params);
+
+		// for now, just do 60hz
+		stepVoltageSource(hTripUnit, hKeithley, params.use_bk_precision_9801, false);
 	}
+
+	TurnOffVoltageSource(false);
 
 	return true;
 }
@@ -1366,10 +1371,22 @@ static void Async_FullACPro2_RG(bool shouldDoLoopingCal)
 		return;
 	}
 
-	if (!RIGOL_DG1000Z_Connected)
+	if (fullRCCalibrationParams.use_rigol_dg1000z)
 	{
-		PrintToScreen("Rigol DG1000z AWG not connected");
-		return;
+		if (!RIGOL_DG1000Z_Connected)
+		{
+			PrintToScreen("Rigol DG1000z AWG not connected");
+			return;
+		}
+	}
+
+	if (fullRCCalibrationParams.use_bk_precision_9801)
+	{
+		if (!BK_PRECISION_9801_Connected)
+		{
+			PrintToScreen("BK Precision 9801 not connected");
+			return;
+		}
 	}
 
 	if (tripUnitType != TripUnitType::AC_PRO2_RC)
@@ -1519,6 +1536,7 @@ void PrintConnectionStatus()
 	PrintToScreen(Dots(25, "Trip Unit Type") + TripUnitTypeToString(tripUnitType));
 	PrintConnectionColumns("Arduino_AutoCAL_Lite", "Virtual Comm", ConnectedStatus(hArduino));
 	PrintConnectionColumns("Rigol_DG1000z", "USB-TCM", (RIGOL_DG1000Z_Connected ? "CONNECTED" : "DISCONNECTED"));
+	PrintConnectionColumns("BK Precision-9801", "USB-TCM", (BK_PRECISION_9801_Connected ? "CONNECTED" : "DISCONNECTED"));
 
 	PrintToScreen("");
 
@@ -3367,7 +3385,7 @@ static void menu_ID_BK_PRECISION_9801_APPLYSINWAVE1()
 	// convert voltsRMSAsString to a double
 	double voltsRMS = std::stod(voltageRMS);
 
-	auto BK_9801_MAX_VOLTS_RMS = 30;
+	auto BK_9801_MAX_VOLTS_RMS = 300;
 
 	// verify is less than BK_9801_MAX_VOLTS_RMS
 	if (voltsRMS > BK_9801_MAX_VOLTS_RMS)
@@ -4795,7 +4813,9 @@ static void stepVoltageSource(HANDLE hTripUnit, HANDLE hKeithley, bool use_bk_pr
 		0.001, 0.0015, 0.003, 0.006, 0.012, 0.025, 0.050, 0.100, 0.200, 0.300,
 		0.400, 0.500, 0.600, 0.700, 0.800, 0.900, 1.000, 1.100, 1.200, 1.300,
 		1.500, 1.600, 1.700, 1.800, 1.900, 2.000, 2.100, 2.200, 2.300, 2.400,
-		2.500, 3.000, 3.500, 4.000, 4.500, 5.000, 5.500, 6.000, 6.500, 7.000};
+		2.500, 3.000, 3.500, 4.000, 4.500, 5.000, 5.500, 6.000, 6.500, 7.000,
+		8.0, 9.0, 10.0, 11, 12, 13, 14, 15, 16, 17, 18,
+		19, 20, 21, 22, 23, 24, 25, 26, 27};
 
 	for (auto voltsRMS : test_points_voltsRMS)
 	{
@@ -4857,7 +4877,7 @@ static void stepVoltageSource(HANDLE hTripUnit, HANDLE hKeithley, bool use_bk_pr
 		// Print the results
 		std::string result = std::to_string(voltsRMS) + ", " +
 							 std::to_string(keithleyReading) + ", " +
-							 std::to_string(int16_t(keithleyReading * 3800)) + ", " +
+							 std::to_string(int32_t(keithleyReading * 3800)) + ", " +
 							 CalcResult(rsp.msgRspDynamics4.Dynamics.Measurements.Ia, keithleyReading) + ", " +
 							 CalcResult(rsp.msgRspDynamics4.Dynamics.Measurements.Ib, keithleyReading) + ", " +
 							 CalcResult(rsp.msgRspDynamics4.Dynamics.Measurements.Ic, keithleyReading) + ", " +

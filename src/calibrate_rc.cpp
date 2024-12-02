@@ -370,6 +370,7 @@ namespace ACPRO2_RG
 		CalibrationRequest calRequest = {0};
 		double KeithleyReadingVoltsRMS;
 		int16_t RMSCurrentToCalibrateTo;
+		bool EverythingOK = true;
 
 		bool retval;
 		int rms_index = 0;
@@ -406,8 +407,15 @@ namespace ACPRO2_RG
 			}
 			else
 			{
-				BK_PRECISION_9801::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
-				BK_PRECISION_9801::EnableOutput();
+				EverythingOK = true;
+				EverythingOK &= BK_PRECISION_9801::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
+				EverythingOK &= BK_PRECISION_9801::EnableOutput();
+
+				if (!EverythingOK)
+				{
+					PrintToScreen("error setting up BK_PRECISION_9801 for calibration");
+					return false;
+				}
 			}
 
 			if (!KEITHLEY::VoltageOnKeithleyIsStable(hKeithley))
@@ -420,6 +428,18 @@ namespace ACPRO2_RG
 			if (KeithleyReadingVoltsRMS == std::numeric_limits<double>::quiet_NaN())
 			{
 				PrintToScreen("Keithley voltage reading failed; aborted");
+				return false;
+			}
+
+			if (KeithleyReadingVoltsRMS > params.hi_gain_voltages_rms[rms_index] * 1.25)
+			{
+				PrintToScreen("Keithley voltage reading too high; aborted");
+				return false;
+			}
+
+			if (KeithleyReadingVoltsRMS < params.hi_gain_voltages_rms[rms_index] * 0.75)
+			{
+				PrintToScreen("Keithley voltage reading too low; aborted");
 				return false;
 			}
 
@@ -525,8 +545,15 @@ namespace ACPRO2_RG
 			}
 			else
 			{
-				BK_PRECISION_9801::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
-				BK_PRECISION_9801::EnableOutput();
+				EverythingOK = true;
+				EverythingOK &= BK_PRECISION_9801::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
+				EverythingOK &= BK_PRECISION_9801::EnableOutput();
+
+				if (!EverythingOK)
+				{
+					PrintToScreen("error setting up BK_PRECISION_9801 for calibration");
+					return false;
+				}
 			}
 
 			if (!KEITHLEY::VoltageOnKeithleyIsStable(hKeithley))
@@ -539,6 +566,18 @@ namespace ACPRO2_RG
 			if (KeithleyReadingVoltsRMS == std::numeric_limits<double>::quiet_NaN())
 			{
 				PrintToScreen("Keithley voltage reading failed; aborted");
+				return false;
+			}
+
+			if (KeithleyReadingVoltsRMS > params.lo_gain_voltages_rms[rms_index] * 1.25)
+			{
+				PrintToScreen("Keithley voltage reading too high; aborted");
+				return false;
+			}
+
+			if (KeithleyReadingVoltsRMS < params.lo_gain_voltages_rms[rms_index] * 0.75)
+			{
+				PrintToScreen("Keithley voltage reading too low; aborted");
 				return false;
 			}
 
@@ -674,6 +713,7 @@ namespace ACPRO2_RG
 		//////////////////////////////////////////////////////////////////////////////////////////////
 
 		retryCount = 0;
+
 		while (retryCount < TOTAL_CHANNEL_CAL_ATTEMPTS)
 		{
 			retval = CalibrateOneGain(hTripUnit, hKeithley, _CALIBRATION_REQUEST_HI_GAIN_0_5, params, Do60hz);

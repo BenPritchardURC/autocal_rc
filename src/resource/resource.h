@@ -209,7 +209,6 @@
 #define ID_ARDUINO_RUNTEST_MULTI_GF 40145
 #define IDD_CUSTOM_DIALOG 40146
 #define IDC_BIG_TEXT_LABEL 40147
-
 #define ID_RC_FULL_CAL_LOOP 40148
 
 // Next default values for new objects
