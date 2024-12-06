@@ -21,8 +21,13 @@ namespace RIGOL_DG1000Z
     bool Initialize();
 
     bool SetupToApplySINWave(bool use50Hz, const std::string &voltsRMSAsString);
+    bool SetupToApplySINWave_2(bool use50Hz, const std::string &voltsRMSAsString);
+
     bool EnableOutput();
+    bool EnableOutput_2();
+
     bool DisableOutput();
+    bool DisableOutput_2();
 
     bool SetupSyncOutput();
     void ProcessSCPIScript(const std::string &filename);

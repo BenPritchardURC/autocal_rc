@@ -225,7 +225,7 @@ namespace RIGOL_DG1000Z
 
 	// we are writing the command to the signal generator as a string,
 	// so i think it makes sense to pass the voltage as one here
-	bool SetupToApplySINWave(bool use50Hz, const std::string &voltsRMSAsString)
+	bool SetupToApplySINWave_ByChannel(bool use50Hz, const std::string &voltsRMSAsString, bool useChannel2NotONe)
 	{
 		bool retval = true;
 		std::string cmd_to_apply;
@@ -235,16 +235,19 @@ namespace RIGOL_DG1000Z
 		// we are trying to make a string like this to send:
 		// :SOUR1:APPL:SIN 50,2.5vrms,0,0
 
-		cmd_to_apply = ":SOUR1:APPL:SIN ";
+		cmd_to_apply = ":SOUR";
+
+		if (useChannel2NotONe)
+			cmd_to_apply += "2";
+		else
+			cmd_to_apply += "1";
+
+		cmd_to_apply += ":APPL:SIN ";
 
 		if (use50Hz)
-		{
 			cmd_to_apply += "50,";
-		}
 		else
-		{
 			cmd_to_apply += "60,";
-		}
 
 		cmd_to_apply += voltsRMSAsString + "vrms,0,0";
 		retval = WriteCommand(cmd_to_apply);
@@ -252,14 +255,40 @@ namespace RIGOL_DG1000Z
 		return retval;
 	}
 
+	// channel 1
+	bool SetupToApplySINWave(bool use50Hz, const std::string &voltsRMSAsString)
+	{
+		return SetupToApplySINWave_ByChannel(use50Hz, voltsRMSAsString, false);
+	}
+
+	// channel 2
+	bool SetupToApplySINWave_2(bool use50Hz, const std::string &voltsRMSAsString)
+	{
+		return SetupToApplySINWave_ByChannel(use50Hz, voltsRMSAsString, true);
+	}
+
+	// channel 1
 	bool EnableOutput()
 	{
 		return WriteCommand(":OUTP1 ON");
 	}
 
+	// channel 2
+	bool EnableOutput_2()
+	{
+		return WriteCommand(":OUTP2 ON");
+	}
+
+	// channel 1
 	bool DisableOutput()
 	{
 		return WriteCommand(":OUTP1 OFF");
+	}
+
+	// channel 2
+	bool DisableOutput_2()
+	{
+		return WriteCommand(":OUTP2 OFF");
 	}
 
 	// issue the commands needed to turn on the sync output

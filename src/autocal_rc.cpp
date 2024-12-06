@@ -57,9 +57,10 @@ static void stepBK9801(HANDLE hTripUnit, HANDLE hKeithley, bool do50hz);
 static void stepRIGOL(HANDLE hTripUnit, HANDLE hKeithley, bool do50hz);
 static void CenterDialog(HWND hwnd);
 
+// global variables
 static std::ofstream log_file;
-
 bool ArduinoAbortTimingTest = false;
+bool RigolDualChannelMode = false;
 
 static void OpenURL(const char *url)
 {
@@ -844,6 +845,7 @@ void GatherRCFullCalibrationParams(HWND hwnd)
 
 	fullRCCalibrationParams.do50hz = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_CHECK_DO50hz));
 	fullRCCalibrationParams.do60hz = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_CHECK_DO60hz));
+	fullRCCalibrationParams.useRigolDualChannelMode = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_CHECK_USE_RIGOL_DUALCHANNEL));
 
 	// 0.5
 	GetDlgItemTextA(hwnd, IDC_V1, tmpBuf, sizeof(tmpBuf));
@@ -985,6 +987,9 @@ void ScatterRCFullCalibrationParams(HWND hwnd)
 
 	SendMessage(GetDlgItem(hwnd, IDC_CHECK_DO60hz), BM_SETCHECK,
 				fullRCCalibrationParams.do60hz ? BST_CHECKED : BST_UNCHECKED, 0);
+
+	SendMessage(GetDlgItem(hwnd, IDC_CHECK_USE_RIGOL_DUALCHANNEL), BM_SETCHECK,
+				fullRCCalibrationParams.useRigolDualChannelMode ? BST_CHECKED : BST_UNCHECKED, 0);
 
 	// 0.5
 	SetDlgItemTextA(hwnd, IDC_V1, formatFloat(fullRCCalibrationParams.hi_gain_voltages_rms[0], 3).c_str());
@@ -1584,6 +1589,8 @@ void PrintConnectionStatus()
 
 	if (INVALID_HANDLE_VALUE != hArduino.handle)
 		menu_ID_ARDUINO_PRINTVERSION();
+
+	PrintToScreen("Rigol Dual Channel Mode: " + boolToString(RigolDualChannelMode));
 }
 
 static void PrintStatus(uint32_t status)
@@ -3360,6 +3367,18 @@ static void menu_ID_DG1000Z_RUNSCRIPT()
 	RIGOL_DG1000Z::ProcessSCPIScript(scriptFile);
 }
 
+static void menu_ID_RIGOL_ENABLE_DUAL_CHANNEL()
+{
+	RigolDualChannelMode = true;
+	MessageBoxA(NULL, "Rigol Dual Channel Mode Enabled.\nYOU HAVE TO WIRE THE CIRCUIT MANAULLY TO REFLECT THIS!", "Info", MB_OK | MB_ICONINFORMATION);
+}
+
+static void menu_ID_RIGOL_DISABLE_DUAL_CHANNEL()
+{
+	RigolDualChannelMode = false;
+	MessageBoxA(NULL, "Dual Channel Mode Disabled\nYOU HAVE TO WIRE THE CIRCUIT MANAULLY TO REFLECT THIS!", "Info", MB_OK | MB_ICONINFORMATION);
+}
+
 //////////////////////////////////////////////////////
 // BK_PRECISION_9801
 //////////////////////////////////////////////////////
@@ -4680,6 +4699,8 @@ static void menu_ID_RC_FULL_CAL(bool shouldDoLoopingCal)
 {
 	HANDLE hHandleForTripUnit;
 
+	/*
+
 	if (INVALID_HANDLE_VALUE == (hHandleForTripUnit = GetHandleForTripUnit()))
 	{
 		PrintToScreen("Trip Unit not connected");
@@ -4691,6 +4712,7 @@ static void menu_ID_RC_FULL_CAL(bool shouldDoLoopingCal)
 		PrintToScreen("Keithley not connected");
 		return;
 	}
+	*/
 
 	// read from the INI file what params we used last time
 	ACPRO2_RG::ReadFullCalibrationParamsFromINI(iniFile, fullRCCalibrationParams);
@@ -5432,6 +5454,13 @@ static void processCommands(HWND hwnd, WPARAM wParam)
 	case ID_DG1000Z_RUNSCRIPT:
 		menu_ID_DG1000Z_RUNSCRIPT();
 		break;
+
+	case ID_RIGOL_ENABLE_DUAL_CHANNEL:
+		menu_ID_RIGOL_ENABLE_DUAL_CHANNEL();
+		break;
+
+	case ID_RIGOL_DISABLE_DUAL_CHANNEL:
+		menu_ID_RIGOL_DISABLE_DUAL_CHANNEL();
 
 		//////////////////////////////////////////////////////
 		// BK PRECISION 9801

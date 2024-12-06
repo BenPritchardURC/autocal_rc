@@ -15,6 +15,7 @@
 #include <fstream>
 
 extern TripUnitType tripUnitType;
+extern bool RigolDualChannelMode;
 
 // the code in here is specific to the ACPRO2-RC trip unit
 namespace ACPRO2_RG
@@ -370,6 +371,7 @@ namespace ACPRO2_RG
 		double KeithleyReadingVoltsRMS;
 		int16_t RMSCurrentToCalibrateTo;
 		bool EverythingOK = true;
+		float tmp_vRMS;
 
 		bool retval;
 		int rms_index = 0;
@@ -401,8 +403,26 @@ namespace ACPRO2_RG
 
 			if (params.use_rigol_dg1000z)
 			{
-				RIGOL_DG1000Z::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
-				RIGOL_DG1000Z::EnableOutput();
+				if (params.useRigolDualChannelMode)
+				{
+					tmp_vRMS = params.hi_gain_voltages_rms[rms_index] / 2.0;
+					voltsRMS_as_string = std::to_string(tmp_vRMS);
+
+					// apply 1/2 the voltage to each channel
+					RIGOL_DG1000Z::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
+					RIGOL_DG1000Z::EnableOutput();
+
+					// apply 1/2 the voltage to each channel
+					RIGOL_DG1000Z::SetupToApplySINWave_2(!Is60hz, voltsRMS_as_string);
+					RIGOL_DG1000Z::EnableOutput_2();
+
+					// TODO: maybe sync the outputs??
+				}
+				else
+				{
+					RIGOL_DG1000Z::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
+					RIGOL_DG1000Z::EnableOutput();
+				}
 			}
 			else
 			{
@@ -492,7 +512,12 @@ namespace ACPRO2_RG
 				PrintToScreen("error calibrating A/B/C/N @ " + gain_constant_to_string(GAIN_CONSTANT));
 
 				if (params.use_rigol_dg1000z)
+				{
 					RIGOL_DG1000Z::DisableOutput();
+
+					if (params.useRigolDualChannelMode)
+						RIGOL_DG1000Z::DisableOutput_2();
+				}
 				else
 					BK_PRECISION_9801::DisableOutput();
 
@@ -539,8 +564,24 @@ namespace ACPRO2_RG
 
 			if (params.use_rigol_dg1000z)
 			{
-				RIGOL_DG1000Z::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
-				RIGOL_DG1000Z::EnableOutput();
+				if (params.useRigolDualChannelMode)
+				{
+					tmp_vRMS = params.hi_gain_voltages_rms[rms_index] / 2.0;
+					voltsRMS_as_string = std::to_string(tmp_vRMS);
+
+					// apply 1/2 the voltage to each channel
+					RIGOL_DG1000Z::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
+					RIGOL_DG1000Z::EnableOutput();
+
+					// apply 1/2 the voltage to each channel
+					RIGOL_DG1000Z::SetupToApplySINWave_2(!Is60hz, voltsRMS_as_string);
+					RIGOL_DG1000Z::EnableOutput_2();
+				}
+				else
+				{
+					RIGOL_DG1000Z::SetupToApplySINWave(!Is60hz, voltsRMS_as_string);
+					RIGOL_DG1000Z::EnableOutput();
+				}
 			}
 			else
 			{
@@ -631,7 +672,12 @@ namespace ACPRO2_RG
 			{
 				PrintToScreen("error calibrating A/B/C/N @ " + gain_constant_to_string(GAIN_CONSTANT));
 				if (params.use_rigol_dg1000z)
+				{
 					RIGOL_DG1000Z::DisableOutput();
+
+					if (params.useRigolDualChannelMode)
+						RIGOL_DG1000Z::DisableOutput_2();
+				}
 				else
 					BK_PRECISION_9801::DisableOutput();
 
@@ -669,7 +715,12 @@ namespace ACPRO2_RG
 
 		// calibration is done; make sure to disable the output of the signal generator
 		if (params.use_rigol_dg1000z)
+		{
 			RIGOL_DG1000Z::DisableOutput();
+
+			if (params.useRigolDualChannelMode)
+				RIGOL_DG1000Z::DisableOutput_2();
+		}
 		else
 			BK_PRECISION_9801::DisableOutput();
 
@@ -704,7 +755,7 @@ namespace ACPRO2_RG
 			}
 		}
 
-		constexpr int TOTAL_CHANNEL_CAL_ATTEMPTS = 1; // 1 = no retries
+		constexpr int TOTAL_CHANNEL_CAL_ATTEMPTS = 2; // 1 = 1 retry
 		int retryCount;
 
 		//////////////////////////////////////////////////////////////////////////////////////////////
@@ -857,6 +908,34 @@ namespace ACPRO2_RG
 			{
 				PrintToScreen("error: must select either high gain or low gain calibration");
 				retval = false;
+			}
+		}
+
+		if (retval)
+		{
+			if (params.useRigolDualChannelMode && params.use_rigol_dg1000z)
+			{
+				if (!RigolDualChannelMode)
+				{
+					PrintToScreen("error: must select dual channel mode for Rigol DG1000Z when using scaled Low Gain voltages. (Look under Rigol DGxx menu!)");
+					retval = false;
+				}
+			}
+		}
+
+		if (retval)
+		{
+			if (params.use_rigol_dg1000z && (params.lo_gain_voltages_rms[0] > 7 ||
+											 params.lo_gain_voltages_rms[1] > 7 ||
+											 params.lo_gain_voltages_rms[2] > 7 ||
+											 params.lo_gain_voltages_rms[3] > 7))
+
+			{
+				if (!RigolDualChannelMode)
+				{
+					PrintToScreen("error: When using Rigol,  dual channel mode must be used if low gain calibrations above 7vRMS are used.");
+					retval = false;
+				}
 			}
 		}
 

@@ -61,6 +61,8 @@ namespace ACPRO2_RG
         bool doHighGain;
         bool doLowGain;
 
+        bool useRigolDualChannelMode;
+
     } FullCalibrationParams;
 
     // private routines
