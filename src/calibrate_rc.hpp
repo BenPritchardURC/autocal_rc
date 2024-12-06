@@ -66,9 +66,10 @@ namespace ACPRO2_RG
     // private routines
 
     static bool CalibrateChannel(HANDLE hTripUnit, CalibrationRequest &calRequest, CalibrationResults &calResults);
-    static bool SetSystemAndDeviceSettings(HANDLE hTripUnit, SetSettingsFuncPtr funcPtr);
 
     // public routines
+
+    bool SetSystemAndDeviceSettings(HANDLE hTripUnit, SetSettingsFuncPtr funcPtr);
 
     bool DoFullTripUnitCAL(
         HANDLE hTripUnit, HANDLE hKeithley, const FullCalibrationParams &params);
@@ -95,12 +96,12 @@ namespace ACPRO2_RG
     bool WriteCalibrationToFlash(HANDLE hTripUnit);
     bool VirginizeTripUnit(HANDLE hTripUnit);
     bool CheckTripUnitCalibration(HANDLE hTripUnit);
-    
+
     bool TripUnitIsV4(HANDLE hTripUnit);
     bool Enable50hzPersonality(HANDLE hTripUnit);
     bool DoCalibrationCommand(HANDLE hTripUnit, int CalCommand);
     bool Uncalibrate(HANDLE hTripUnit);
     bool DoFullTripUnitCAL(
-        HANDLE hTripUnit, HANDLE hKeithley, const FullCalibrationParams& params);
+        HANDLE hTripUnit, HANDLE hKeithley, const FullCalibrationParams &params);
 
 }

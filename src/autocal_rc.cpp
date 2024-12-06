@@ -1333,6 +1333,41 @@ INT_PTR CALLBACK ManualCal_DlgProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
 	return FALSE;
 }
 
+// don't use this function.
+// there probably is a better way to do this
+// this is just being used temporarily in LoopDoFullTripUnitCAL()
+static void HACK_MakeTripUnitReboot(HANDLE hTripUnit)
+{
+
+	URCMessageUnion rsp1 = {0};
+
+	bool retval = true;
+
+	ACPRO2_RG::SetSystemAndDeviceSettings(hTripUnit,
+										  [](SystemSettings4 *Settings, DeviceSettings4 *DevSettings4)
+										  {
+											  DevSettings4->ModbusForcedTripEnabled = true;
+											  return true;
+										  });
+
+	// It is possible the trip unit reboots here...
+	// Wait 2 Seconds
+	PrintToScreen("Waiting 2 seconds for trip unit to reboot...");
+	Sleep(2000);
+
+	ACPRO2_RG::SetSystemAndDeviceSettings(hTripUnit,
+										  [](SystemSettings4 *Settings, DeviceSettings4 *DevSettings4)
+										  {
+											  DevSettings4->ModbusForcedTripEnabled = false;
+											  return true;
+										  });
+
+	// It is possible the trip unit reboots here...
+	// Wait 2 Seconds
+	PrintToScreen("Waiting 2 seconds for trip unit to reboot...");
+	Sleep(2000);
+}
+
 // perform a full calibration procedure on a ACPRO2-RC trip unit
 bool LoopDoFullTripUnitCAL(
 	HANDLE hTripUnit, HANDLE hKeithley, const ACPRO2_RG::FullCalibrationParams &params)
@@ -1340,13 +1375,17 @@ bool LoopDoFullTripUnitCAL(
 	for (int i = 0; i < 32; i++)
 	{
 		PrintToScreen("Starting cal number: " + std::to_string(i + 1));
-		// ACPRO2_RG::DoFullTripUnitCAL(hTripUnit, hKeithley, params);
+		ACPRO2_RG::DoFullTripUnitCAL(hTripUnit, hKeithley, params);
+
+		// we cannot do a voltage sweep without rebooting the trip unit first
+		// after a full calibration
+		HACK_MakeTripUnitReboot(hTripUnit);
 
 		// for now, just do 60hz
 		stepVoltageSource(hTripUnit, hKeithley, params.use_bk_precision_9801, false);
 	}
 
-	TurnOffVoltageSource(false);
+	TurnOffVoltageSource(params.use_bk_precision_9801);
 
 	return true;
 }
@@ -4772,18 +4811,28 @@ static void TurnOffVoltageSource(bool use_bk_precision_9801_not_rigol_dg1000z)
 {
 	if (use_bk_precision_9801_not_rigol_dg1000z)
 	{
-		if (!BK_PRECISION_9801::EnableOutput())
+		// be redundant in our attempts to turn off the voltage source
+		for (int i = 0; i < 2; i++)
 		{
-			PrintToScreen("BK_PRECISION_9801::EnableOutput() failed");
-			WarnVoltageIsPresent();
+			if (!BK_PRECISION_9801::DisableOutput())
+			{
+				PrintToScreen("BK_PRECISION_9801::EnableOutput() failed");
+			}
+
+			Sleep(1000);
 		}
 	}
 	else
 	{
-		if (!RIGOL_DG1000Z::EnableOutput())
+		// be redundant in our attempts to turn off the voltage source
+		for (int i = 0; i < 2; i++)
 		{
-			PrintToScreen("RIGOL_DG1000Z::EnableOutput() failed");
-			WarnVoltageIsPresent();
+			if (!RIGOL_DG1000Z::DisableOutput())
+			{
+				PrintToScreen("RIGOL_DG1000Z::EnableOutput() failed");
+			}
+
+			Sleep(1000);
 		}
 	}
 }
@@ -4809,13 +4858,23 @@ static void stepVoltageSource(HANDLE hTripUnit, HANDLE hKeithley, bool use_bk_pr
 	PrintToScreen("Commanded vRMS, Keithley vRMS, Keithley * 3800, TripUnit_A aRMS, TripUnit_A Error%, TripUnit_B aRMS, TripUnit_B Error%, TripUnit_C aRMS, TripUnit_C Error%, TripUnit_N aRMS, TripUnit_N Error%");
 
 	// Declare and initialize the vector with the given data
-	std::vector<double> test_points_voltsRMS = {
-		0.001, 0.0015, 0.003, 0.006, 0.012, 0.025, 0.050, 0.100, 0.200, 0.300,
-		0.400, 0.500, 0.600, 0.700, 0.800, 0.900, 1.000, 1.100, 1.200, 1.300,
-		1.500, 1.600, 1.700, 1.800, 1.900, 2.000, 2.100, 2.200, 2.300, 2.400,
-		2.500, 3.000, 3.500, 4.000, 4.500, 5.000, 5.500, 6.000, 6.500, 7.000,
-		8.0, 9.0, 10.0, 11, 12, 13, 14, 15, 16, 17, 18,
-		19, 20, 21, 22, 23, 24, 25, 26, 27};
+	std::vector<double> test_points_voltsRMS;
+
+	// BK Precision can produce higher voltage...
+	if (use_bk_precision_9801_not_rigol_dg1000z)
+		test_points_voltsRMS = {
+			0.001, 0.0015, 0.003, 0.006, 0.012, 0.025, 0.050, 0.100, 0.200, 0.300,
+			0.400, 0.500, 0.600, 0.700, 0.800, 0.900, 1.000, 1.100, 1.200, 1.300,
+			1.500, 1.600, 1.700, 1.800, 1.900, 2.000, 2.100, 2.200, 2.300, 2.400,
+			2.500, 3.000, 3.500, 4.000, 4.500, 5.000, 5.500, 6.000, 6.500, 7.000,
+			8.0, 9.0, 10.0, 11, 12, 13, 14, 15, 16, 17, 18,
+			19, 20, 21, 22, 23, 24, 25, 26, 27};
+	else
+		test_points_voltsRMS = {
+			0.001, 0.0015, 0.003, 0.006, 0.012, 0.025, 0.050, 0.100, 0.200, 0.300,
+			0.400, 0.500, 0.600, 0.700, 0.800, 0.900, 1.000, 1.100, 1.200, 1.300,
+			1.500, 1.600, 1.700, 1.800, 1.900, 2.000, 2.100, 2.200, 2.300, 2.400,
+			2.500, 3.000, 3.500, 4.000, 4.500, 5.000, 5.500, 6.000, 6.500, 7.000};
 
 	for (auto voltsRMS : test_points_voltsRMS)
 	{

@@ -204,7 +204,6 @@ namespace ACPRO2_RG
 	bool Time_CalibrateChannel(
 		HANDLE hTripUnit, CalibrationRequest &calRequest, CalibrationResults &calResults, long long &duration)
 	{
-
 		auto start = std::chrono::high_resolution_clock::now();
 
 		bool retval = CalibrateChannel(hTripUnit, calRequest, calResults);
@@ -277,7 +276,7 @@ namespace ACPRO2_RG
 		return ACPRO2_RG::SetSystemAndDeviceSettings(hTripUnit, funcptr);
 	}
 
-	static bool SetSystemAndDeviceSettings(HANDLE hTripUnit, SetSettingsFuncPtr funcPtr)
+	bool SetSystemAndDeviceSettings(HANDLE hTripUnit, SetSettingsFuncPtr funcPtr)
 	{
 		_ASSERT(hTripUnit != INVALID_HANDLE_VALUE);
 
