@@ -3303,7 +3303,14 @@ static void menu_ID_SIGNALGENERATOR_APPLYSINWAVE1()
 	bool operationOK = true;
 	std::string voltageRMS;
 
-	if (!GetInputValue("Enter RIGOL_DG1000Z RMS voltage; 0 to 6 volts RMS", -1))
+	if (!GetInputValue("Enter RIGOL_DG1000Z RMS voltage; 0 to 7 volts RMS", -1))
+	{
+		PrintToScreen("Invalid voltage");
+		return;
+	}
+
+	float tmpFloat = std::stof(ReturnedInputValue_String);
+	if (!InRange(tmpFloat, 0, 7))
 	{
 		PrintToScreen("Invalid voltage");
 		return;
@@ -3329,6 +3336,121 @@ static void menu_ID_SIGNALGENERATOR_APPLYSINWAVE1()
 		PrintToScreen("Error applying sine wave to RIGOL_DG1000Z; output disabled");
 	}
 }
+
+//////////////////////////////////////////////////////////////////
+// DUAL CHANNEL
+//////////////////////////////////////////////////////////////////
+
+static void menu_ID_SIGNALGENERATOR_ENABLEOUTPUT_2()
+{
+	if (!RIGOL_DG1000Z_Connected)
+	{
+		PrintToScreen("RIGOL_DG1000Z not connected");
+		return;
+	}
+
+	if (!RigolDualChannelMode)
+	{
+		PrintToScreen("Rigol Dual Channel Mode not enabled");
+		return;
+	}
+
+	bool operationOK = true;
+
+	if (operationOK)
+		operationOK = RIGOL_DG1000Z::EnableOutput_2();
+
+	if (operationOK)
+	{
+		PrintToScreen("RIGOL_DG1000Z output 2 enabled");
+	}
+	else
+	{
+		PrintToScreen("Error enabling RIGOL_DG1000Z output 2");
+	}
+}
+
+static void menu_ID_SIGNALGENERATOR_DISABLEOUTPUT_2()
+{
+	if (!RIGOL_DG1000Z_Connected)
+	{
+		PrintToScreen("RIGOL_DG1000Z not connected");
+		return;
+	}
+
+	if (!RigolDualChannelMode)
+	{
+		PrintToScreen("Rigol Dual Channel Mode not enabled");
+		return;
+	}
+
+	bool operationOK = true;
+
+	if (operationOK)
+		operationOK = RIGOL_DG1000Z::DisableOutput_2();
+
+	if (operationOK)
+	{
+		PrintToScreen("RIGOL_DG1000Z output 2 disabled");
+	}
+	else
+	{
+		PrintToScreen("Error disabling RIGOL_DG1000Z output 2");
+	}
+}
+
+static void menu_ID_SIGNALGENERATOR_APPLYSINWAVE_2()
+{
+	if (!RIGOL_DG1000Z_Connected)
+	{
+		PrintToScreen("RIGOL_DG1000Z not connected");
+		return;
+	}
+
+	if (!RigolDualChannelMode)
+	{
+		PrintToScreen("Rigol Dual Channel Mode not enabled");
+		return;
+	}
+
+	bool operationOK = true;
+	std::string voltageRMS;
+
+	if (!GetInputValue("Enter RIGOL_DG1000Z RMS voltage for channel 2; 0 to 7 volts RMS", -1))
+	{
+		PrintToScreen("Invalid voltage");
+		return;
+	}
+
+	float tmpFloat = std::stof(ReturnedInputValue_String);
+	if (!InRange(tmpFloat, 0, 7))
+	{
+		PrintToScreen("Invalid voltage");
+		return;
+	}
+
+	voltageRMS = ReturnedInputValue_String;
+
+	if (operationOK)
+		operationOK = RIGOL_DG1000Z::SetupToApplySINWave_2(false, voltageRMS);
+
+	if (operationOK)
+	{
+		operationOK = RIGOL_DG1000Z::EnableOutput_2();
+	}
+
+	if (operationOK)
+	{
+		PrintToScreen("Sine wave is currently applied on the RIGOL_DG1000Z (on channel 2); voltage is present");
+	}
+	else
+	{
+		RIGOL_DG1000Z::DisableOutput_2();
+		PrintToScreen("Error applying sine wave to RIGOL_DG1000Z (on channel 2); output 2 disabled");
+	}
+}
+
+//////////////////////////////////////////////////////////////////
 
 static void menu_ID_DG1000Z_SYNC_OUTPUT()
 {
@@ -5461,6 +5583,18 @@ static void processCommands(HWND hwnd, WPARAM wParam)
 
 	case ID_RIGOL_DISABLE_DUAL_CHANNEL:
 		menu_ID_RIGOL_DISABLE_DUAL_CHANNEL();
+
+	case ID_SIGNALGENERATOR_ENABLEOUTPUT_2:
+		menu_ID_SIGNALGENERATOR_ENABLEOUTPUT_2();
+		break;
+
+	case ID_SIGNALGENERATOR_DISABLEOUTPUT_2:
+		menu_ID_SIGNALGENERATOR_DISABLEOUTPUT_2();
+		break;
+
+	case ID_SIGNALGENERATOR_APPLYSINWAVE_2:
+		menu_ID_SIGNALGENERATOR_APPLYSINWAVE_2();
+		break;
 
 		//////////////////////////////////////////////////////
 		// BK PRECISION 9801
