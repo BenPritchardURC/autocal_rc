@@ -291,6 +291,12 @@ namespace RIGOL_DG1000Z
 		return WriteCommand(":OUTP2 OFF");
 	}
 
+	// channel 2
+	bool SendChannel2Phase180()
+	{
+		return WriteCommand(":SOUR2:PHAS 180");
+	}
+
 	// issue the commands needed to turn on the sync output
 	// :OUTPut 1:SYNC:ON
 	// :OUTPUT 1:SYNC:DELAY 0

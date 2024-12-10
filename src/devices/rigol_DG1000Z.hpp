@@ -29,7 +29,8 @@ namespace RIGOL_DG1000Z
     bool DisableOutput();
     bool DisableOutput_2();
 
+    bool SendChannel2Phase180();
+
     bool SetupSyncOutput();
     void ProcessSCPIScript(const std::string &filename);
-
 }

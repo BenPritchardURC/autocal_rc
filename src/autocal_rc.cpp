@@ -3450,6 +3450,29 @@ static void menu_ID_SIGNALGENERATOR_APPLYSINWAVE_2()
 	}
 }
 
+static void menu_ID_RIGOL_PHASE2_PHASE_180()
+{
+	if (!RIGOL_DG1000Z_Connected)
+	{
+		PrintToScreen("RIGOL_DG1000Z not connected");
+		return;
+	}
+
+	bool operationOK = true;
+
+	if (operationOK)
+		operationOK = RIGOL_DG1000Z::SendChannel2Phase180();
+
+	if (operationOK)
+	{
+		PrintToScreen("RIGOL_DG1000Z 'SOUR2:PHAS 180' command successful");
+	}
+	else
+	{
+		PrintToScreen("Error sending 'SOUR2:PHAS 180' command");
+	}
+}
+
 //////////////////////////////////////////////////////////////////
 
 static void menu_ID_DG1000Z_SYNC_OUTPUT()
@@ -3491,14 +3514,28 @@ static void menu_ID_DG1000Z_RUNSCRIPT()
 
 static void menu_ID_RIGOL_ENABLE_DUAL_CHANNEL()
 {
+	if (!RIGOL_DG1000Z_Connected)
+	{
+		PrintToScreen("RIGOL_DG1000Z not connected");
+		return;
+	}
+
 	RigolDualChannelMode = true;
 	MessageBoxA(NULL, "Rigol Dual Channel Mode Enabled.\nYOU HAVE TO WIRE THE CIRCUIT MANAULLY TO REFLECT THIS!", "Info", MB_OK | MB_ICONINFORMATION);
+	PrintConnectionStatus();
 }
 
 static void menu_ID_RIGOL_DISABLE_DUAL_CHANNEL()
 {
+	if (!RIGOL_DG1000Z_Connected)
+	{
+		PrintToScreen("RIGOL_DG1000Z not connected");
+		return;
+	}
+
 	RigolDualChannelMode = false;
 	MessageBoxA(NULL, "Dual Channel Mode Disabled\nYOU HAVE TO WIRE THE CIRCUIT MANAULLY TO REFLECT THIS!", "Info", MB_OK | MB_ICONINFORMATION);
+	PrintConnectionStatus();
 }
 
 //////////////////////////////////////////////////////
@@ -4821,8 +4858,6 @@ static void menu_ID_RC_FULL_CAL(bool shouldDoLoopingCal)
 {
 	HANDLE hHandleForTripUnit;
 
-	/*
-
 	if (INVALID_HANDLE_VALUE == (hHandleForTripUnit = GetHandleForTripUnit()))
 	{
 		PrintToScreen("Trip Unit not connected");
@@ -4834,7 +4869,6 @@ static void menu_ID_RC_FULL_CAL(bool shouldDoLoopingCal)
 		PrintToScreen("Keithley not connected");
 		return;
 	}
-	*/
 
 	// read from the INI file what params we used last time
 	ACPRO2_RG::ReadFullCalibrationParamsFromINI(iniFile, fullRCCalibrationParams);
@@ -5594,6 +5628,10 @@ static void processCommands(HWND hwnd, WPARAM wParam)
 
 	case ID_SIGNALGENERATOR_APPLYSINWAVE_2:
 		menu_ID_SIGNALGENERATOR_APPLYSINWAVE_2();
+		break;
+
+	case ID_RIGOL_PHASE2_PHASE_180:
+		menu_ID_RIGOL_PHASE2_PHASE_180();
 		break;
 
 		//////////////////////////////////////////////////////

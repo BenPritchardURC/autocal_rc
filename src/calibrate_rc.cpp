@@ -755,6 +755,15 @@ namespace ACPRO2_RG
 			}
 		}
 
+		if (params.useRigolDualChannelMode)
+		{
+			if (!RIGOL_DG1000Z::SendChannel2Phase180())
+			{
+				PrintToScreen("error setting Rigol DG1000Z to 180 degrees phase shift for channel 2");
+				return false;
+			}
+		}
+
 		constexpr int TOTAL_CHANNEL_CAL_ATTEMPTS = 2; // 1 = 1 retry
 		int retryCount;
 
