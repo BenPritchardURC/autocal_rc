@@ -297,6 +297,15 @@ namespace RIGOL_DG1000Z
 		return WriteCommand(":SOUR2:PHAS 180");
 	}
 
+	bool SendSyncChannels()
+	{
+		bool retval = true;
+		retval &= WriteCommand(":SOUR1:PHAS:INIT");
+		Sleep(1000);
+		retval &= WriteCommand(":SOUR2:PHAS:SYNC");
+		return retval;
+	}
+
 	// issue the commands needed to turn on the sync output
 	// :OUTPut 1:SYNC:ON
 	// :OUTPUT 1:SYNC:DELAY 0
@@ -430,6 +439,9 @@ namespace RIGOL_DG1000Z
 		PrintToScreen("====================================");
 		PrintToScreen("");
 		ProcessLines(filename, [](const std::string &line)
-					 { SendSCPICommand(line); });
+					 { 
+						SendSCPICommand(line);
+						PrintToScreen("waiting two seconds between SCPI commands..."); 
+						Sleep(2000); });
 	}
 }

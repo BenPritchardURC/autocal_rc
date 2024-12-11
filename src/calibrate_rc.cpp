@@ -416,7 +416,8 @@ namespace ACPRO2_RG
 					RIGOL_DG1000Z::SetupToApplySINWave_2(!Is60hz, voltsRMS_as_string);
 					RIGOL_DG1000Z::EnableOutput_2();
 
-					// TODO: maybe sync the outputs??
+					// now sync the outputs
+					RIGOL_DG1000Z::SendSyncChannels();
 				}
 				else
 				{
@@ -761,6 +762,15 @@ namespace ACPRO2_RG
 			{
 				PrintToScreen("error setting Rigol DG1000Z to 180 degrees phase shift for channel 2");
 				return false;
+			}
+
+			if (!RIGOL_DG1000Z::SendSyncChannels())
+			{
+				if (!RIGOL_DG1000Z::SendSyncChannels())
+				{
+					PrintToScreen("error setting Rigol DG1000Z command to sync channels");
+					return false;
+				}
 			}
 		}
 
