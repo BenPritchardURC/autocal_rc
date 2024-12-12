@@ -98,4 +98,23 @@ namespace ARDUINO
 
         return retval;
     }
+
+    bool GetStatus(HANDLE hArduino, ArduinoStatus *status)
+    {
+        AurduinoURCMessageUnion rsp = {0};
+        bool retval;
+
+        SendURCCommand(hArduino, MSG_GET_SW_VER, MSG_ARDUINO_GET_STATUS, ADDR_CAL_APP);
+
+        retval = GetURCResponse(hArduino, (URCMessageUnion *)&rsp) &&
+                 VerifyMessageIsOK((URCMessageUnion *)&rsp, MSG_ARDUINO_RSP_STATUS, sizeof(MsgArduinoGetStatus) - sizeof(MsgHdr));
+
+        if (retval)
+            *status = rsp.msgArduinoGetStatus.status;
+        else
+            *status = {0};
+
+        return retval;
+    }
+
 }

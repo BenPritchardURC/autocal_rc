@@ -30,7 +30,9 @@ namespace ARDUINO
         MSG_START_TIMING_TEST = 9, // ACK returned
         MSG_GET_TIMING_TEST_RESULTS = 10,
         MSG_RSP_TIMING_TEST_RESULTS = 11,
-        MSG_ABORT_TIMING_TEST = 12
+        MSG_ABORT_TIMING_TEST = 12,
+        MSG_ARDUINO_GET_STATUS = 13,
+        MSG_ARDUINO_RSP_STATUS = 14
     };
 
     enum ArduinoNAKs : uint8_t
@@ -77,12 +79,39 @@ namespace ARDUINO
         TimingTestResults timingTestResults;
     } MsgRspTimingTestResults;
 
+    typedef union _ArduinoStatus
+    {
+        uint8_t buf[64];
+        uint8_t status;
+    } ArduinoStatus;
+
+    typedef struct _MsgArduinoGetStatus
+    {
+        MsgHdr Hdr;
+        ArduinoStatus status;
+    } MsgArduinoGetStatus;
+
+    typedef union _AurduinoURCMessageUnion
+    {
+        uint8_t buf[1024]; // largest size of a single URC message....
+
+        MsgHdr Hdr;
+        MsgGetLEDs msgGetLEDs;
+        MsgRspLEDs msgRspLEDs;
+        MsgSetLEDs msgSetLEDs;
+        MsgStartTimingTest msgStartTimingTest;
+        MsgGetTimingTestResults msgGetTimingTestResults;
+        MsgRspTimingTestResults MsgRspTimingTestResults;
+        MsgArduinoGetStatus msgArduinoGetStatus;
+
+    } AurduinoURCMessageUnion;
+
     // prototypes
 
     bool Connect(HANDLE *hArduino, int port);
-
     bool SendConnectMessage(HANDLE hArduino);
     bool SendSetLEDs(HANDLE hArduino, bool beOn);
     bool SetLEDs(HANDLE hArduino, bool beOn);
     bool GetVersion(HANDLE hArduino, SoftVer *ArduinoFirmwareVer);
+    bool GetStatus(HANDLE hArduino, uint8_t *ArduinoStatus);
 }
