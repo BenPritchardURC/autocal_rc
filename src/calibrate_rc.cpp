@@ -115,6 +115,10 @@ namespace ACPRO2_RG
 		WritePrivateProfileStringA(section.c_str(), "doLowGain",
 								   std::to_string(params.doLowGain).c_str(),
 								   INIFileName.c_str());
+
+		WritePrivateProfileStringA(section.c_str(), "DualModeRigol",
+								   std::to_string(params.useRigolDualChannelMode).c_str(),
+								   INIFileName.c_str());
 	}
 
 	void ReadFullCalibrationParamsFromINI(const std::string INIFileName, FullCalibrationParams &params)
@@ -163,6 +167,9 @@ namespace ACPRO2_RG
 
 		GetPrivateProfileStringA(section.c_str(), "doLowGain", "0", buffer, sizeof(buffer), INIFileName.c_str());
 		params.doLowGain = std::stoi(buffer);
+
+		GetPrivateProfileStringA(section.c_str(), "DualModeRigol", "0", buffer, sizeof(buffer), INIFileName.c_str());
+		params.useRigolDualChannelMode = std::stoi(buffer);
 	}
 
 	static bool CalibrateChannel(
@@ -369,7 +376,7 @@ namespace ACPRO2_RG
 		std::string voltsRMS_as_string;
 		CalibrationRequest calRequest = {0};
 		double KeithleyReadingVoltsRMS;
-		int16_t RMSCurrentToCalibrateTo;
+		uint16_t RMSCurrentToCalibrateTo;
 		bool EverythingOK = true;
 		float tmp_vRMS;
 
@@ -418,6 +425,7 @@ namespace ACPRO2_RG
 
 					// now sync the outputs
 					RIGOL_DG1000Z::SendSyncChannels();
+					RIGOL_DG1000Z::SendChannel2Phase180();
 				}
 				else
 				{
@@ -567,7 +575,7 @@ namespace ACPRO2_RG
 			{
 				if (params.useRigolDualChannelMode)
 				{
-					tmp_vRMS = params.hi_gain_voltages_rms[rms_index] / 2.0;
+					tmp_vRMS = params.lo_gain_voltages_rms[rms_index] / 2.0;
 					voltsRMS_as_string = std::to_string(tmp_vRMS);
 
 					// apply 1/2 the voltage to each channel
@@ -577,6 +585,9 @@ namespace ACPRO2_RG
 					// apply 1/2 the voltage to each channel
 					RIGOL_DG1000Z::SetupToApplySINWave_2(!Is60hz, voltsRMS_as_string);
 					RIGOL_DG1000Z::EnableOutput_2();
+
+					RIGOL_DG1000Z::SendSyncChannels();
+					RIGOL_DG1000Z::SendChannel2Phase180();
 				}
 				else
 				{
@@ -753,24 +764,6 @@ namespace ACPRO2_RG
 			if (!retval)
 			{
 				scr_printf("InitCalibration failed");
-			}
-		}
-
-		if (params.useRigolDualChannelMode)
-		{
-			if (!RIGOL_DG1000Z::SendChannel2Phase180())
-			{
-				PrintToScreen("error setting Rigol DG1000Z to 180 degrees phase shift for channel 2");
-				return false;
-			}
-
-			if (!RIGOL_DG1000Z::SendSyncChannels())
-			{
-				if (!RIGOL_DG1000Z::SendSyncChannels())
-				{
-					PrintToScreen("error setting Rigol DG1000Z command to sync channels");
-					return false;
-				}
 			}
 		}
 

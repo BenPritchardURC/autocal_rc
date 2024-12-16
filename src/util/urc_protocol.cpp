@@ -300,6 +300,9 @@ bool VerifyMessageIsOK(URCMessageUnion *msg, int ExpectedMessageType, int Expect
 		PrintToScreen("Message type is not expected type; expected: " + std::to_string(ExpectedMessageType) +
 					  " but got: " + std::to_string(msg->msgHdr.Type));
 
+		if (msg->msgHdr.Type == MSG_NAK)
+			PrintToScreen("NAK error code: " + std::to_string(msg->msgNAK.Error) + " (" + NAKCodeToString(msg->msgNAK.Error) + ")");
+
 		return false;
 	}
 

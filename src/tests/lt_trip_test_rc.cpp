@@ -166,6 +166,10 @@ namespace LT_TRIP_TEST_RC
             auto start = std::chrono::high_resolution_clock::now();
             auto elapsed = std::chrono::milliseconds(0);
 
+            // TODO:
+            // FIXME:
+            // use MSG_ARDUINO_GET_STATUS
+
             while (!ArduinoAbortTimingTest)
             {
                 Sleep(200);

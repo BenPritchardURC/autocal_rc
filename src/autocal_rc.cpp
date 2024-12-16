@@ -2499,7 +2499,7 @@ static void DoAsyncArbitraryCal(HANDLE hHandleForTripUnit, HANDLE hKeithley)
 
 	CalibrationResults calResults = {0};
 	CalibrationRequest calRequest = {0};
-	int16_t RMSCurrentToCalibrateTo;
+	uint16_t RMSCurrentToCalibrateTo;
 
 	calRequest.Commands = 0;
 
@@ -3464,13 +3464,28 @@ static void menu_ID_RIGOL_PHASE2_PHASE_180()
 		operationOK = RIGOL_DG1000Z::SendChannel2Phase180();
 
 	if (operationOK)
-	{
 		PrintToScreen("RIGOL_DG1000Z 'SOUR2:PHAS 180' command successful");
-	}
 	else
-	{
 		PrintToScreen("Error sending 'SOUR2:PHAS 180' command");
+}
+
+static void menu_ID_SETUP_SYNC_CHANNELS()
+{
+	if (!RIGOL_DG1000Z_Connected)
+	{
+		PrintToScreen("RIGOL_DG1000Z not connected");
+		return;
 	}
+
+	bool operationOK = true;
+
+	if (operationOK)
+		operationOK = RIGOL_DG1000Z::SendSyncChannels();
+
+	if (operationOK)
+		PrintToScreen("RIGOL_DG1000Z SyncChannels command successful");
+	else
+		PrintToScreen("Error sending SyncChannels command");
 }
 
 //////////////////////////////////////////////////////////////////
@@ -5632,6 +5647,10 @@ static void processCommands(HWND hwnd, WPARAM wParam)
 
 	case ID_RIGOL_PHASE2_PHASE_180:
 		menu_ID_RIGOL_PHASE2_PHASE_180();
+		break;
+
+	case ID_SETUP_SYNC_CHANNELS:
+		menu_ID_SETUP_SYNC_CHANNELS();
 		break;
 
 		//////////////////////////////////////////////////////

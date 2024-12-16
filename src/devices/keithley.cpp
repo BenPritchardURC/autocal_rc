@@ -201,7 +201,16 @@ namespace KEITHLEY
         if (!quietMode)
             PrintToScreen("Spread Value: " + std::to_string(spreadValue));
 
-        return spreadValue < 0.001;
+        float thresholdRMS = 0.1;
+
+        // 16-dec-2024
+        // per Joe N. ---> for voltages over 3vRMS, use one threshold...
+        if (averageValue > 3)
+            thresholdRMS = 0.0030;
+        else
+            thresholdRMS = 0.0015; // otherwise, use a tighter window...
+
+        return spreadValue < thresholdRMS;
     }
 
     bool VoltageOnKeithleyIsStable(HANDLE hKeithley)
