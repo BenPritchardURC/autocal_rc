@@ -172,6 +172,42 @@ namespace ACPRO2_RG
 		params.useRigolDualChannelMode = std::stoi(buffer);
 	}
 
+	// don't use this function.
+	// there probably is a better way to do this
+	static void MakeTripUnitReboot(HANDLE hTripUnit)
+	{
+
+		URCMessageUnion rsp1 = {0};
+
+		bool retval = true;
+
+		PrintToScreen("Rebooting trip unit...");
+
+		ACPRO2_RG::SetSystemAndDeviceSettings(hTripUnit,
+											  [](SystemSettings4 *Settings, DeviceSettings4 *DevSettings4)
+											  {
+												  DevSettings4->ModbusForcedTripEnabled = true;
+												  return true;
+											  });
+
+		// It is possible the trip unit reboots here...
+		// Wait 2 Seconds
+		PrintToScreen("Waiting 2 seconds for trip unit to reboot...");
+		Sleep(2000);
+
+		ACPRO2_RG::SetSystemAndDeviceSettings(hTripUnit,
+											  [](SystemSettings4 *Settings, DeviceSettings4 *DevSettings4)
+											  {
+												  DevSettings4->ModbusForcedTripEnabled = false;
+												  return true;
+											  });
+
+		// It is possible the trip unit reboots here...
+		// Wait 2 Seconds
+		PrintToScreen("Waiting 2 seconds for trip unit to reboot...");
+		Sleep(2000);
+	}
+
 	static bool CalibrateChannel(
 		HANDLE hTripUnit, CalibrationRequest &calRequest, CalibrationResults &calResults)
 	{
@@ -1035,6 +1071,18 @@ namespace ACPRO2_RG
 					PrintToScreen("60hz calibration failed failed");
 			}
 		}
+
+		// the r.c. trip unit must be rebooted after attempting a calibration
+		// even if the calibration fails.
+		// otherwise the RMS calculations of the trip unit will be incorrect
+		if (!retval)
+		{
+			PrintToScreen("calibration failed; trip unit will still be rebooted...");
+		}
+
+		PrintToScreen("waiting 2 seconds...");
+		Sleep(2000);
+		MakeTripUnitReboot(hTripUnit);
 
 		// check to make sure trip unit reports being calibrated
 		if (retval)

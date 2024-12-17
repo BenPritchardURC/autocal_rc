@@ -1338,41 +1338,6 @@ INT_PTR CALLBACK ManualCal_DlgProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
 	return FALSE;
 }
 
-// don't use this function.
-// there probably is a better way to do this
-// this is just being used temporarily in LoopDoFullTripUnitCAL()
-static void HACK_MakeTripUnitReboot(HANDLE hTripUnit)
-{
-
-	URCMessageUnion rsp1 = {0};
-
-	bool retval = true;
-
-	ACPRO2_RG::SetSystemAndDeviceSettings(hTripUnit,
-										  [](SystemSettings4 *Settings, DeviceSettings4 *DevSettings4)
-										  {
-											  DevSettings4->ModbusForcedTripEnabled = true;
-											  return true;
-										  });
-
-	// It is possible the trip unit reboots here...
-	// Wait 2 Seconds
-	PrintToScreen("Waiting 2 seconds for trip unit to reboot...");
-	Sleep(2000);
-
-	ACPRO2_RG::SetSystemAndDeviceSettings(hTripUnit,
-										  [](SystemSettings4 *Settings, DeviceSettings4 *DevSettings4)
-										  {
-											  DevSettings4->ModbusForcedTripEnabled = false;
-											  return true;
-										  });
-
-	// It is possible the trip unit reboots here...
-	// Wait 2 Seconds
-	PrintToScreen("Waiting 2 seconds for trip unit to reboot...");
-	Sleep(2000);
-}
-
 // perform a full calibration procedure on a ACPRO2-RC trip unit
 bool LoopDoFullTripUnitCAL(
 	HANDLE hTripUnit, HANDLE hKeithley, const ACPRO2_RG::FullCalibrationParams &params)
@@ -1382,9 +1347,13 @@ bool LoopDoFullTripUnitCAL(
 		PrintToScreen("Starting cal number: " + std::to_string(i + 1));
 		ACPRO2_RG::DoFullTripUnitCAL(hTripUnit, hKeithley, params);
 
-		// we cannot do a voltage sweep without rebooting the trip unit first
-		// after a full calibration
-		HACK_MakeTripUnitReboot(hTripUnit);
+		// the trip unit will be rebooted in DoFullTripUnitCAL()
+		// so we do not have to do it here.
+
+		// however:
+		// it is important that the trip unit does in fact reboot
+		// after being calibrated, because otherwise somehow its RMS
+		// calculations are not correct
 
 		// for now, just do 60hz
 		stepVoltageSource(hTripUnit, hKeithley, params.use_bk_precision_9801, false);
