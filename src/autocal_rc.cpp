@@ -22,10 +22,10 @@
 #include <crtdbg.h>
 #include <iomanip>
 #include <sstream>
+#include <unordered_map>
 
 #include "util\ld.hpp" // local display
 #include "devices\arduino.hpp"
-#include "globals.h"
 #include "util\settings.hpp"
 #include "tests\lt_trip_test_rc.hpp"
 #include "tests\st_trip_test_rc.hpp"
@@ -38,6 +38,85 @@
 
 // 1.0 - original
 constexpr float AUTOCAL_RC_VERSION = 1.0;
+
+#define WM_CALIBRATION_UPDATE_MSG (WM_APP + 1) // Custom message for updating UI
+
+#define ID_EDITCHILD 100
+#define ID_TOOL_BAR 101
+#define ID_TIMER_1 1
+#define ID_TIMER_2 2 //
+
+const char g_szClassName[] = "urc_autocal_lite";
+
+enum ConnectionEnum
+{
+	DEVICE_TRIP_UNIT,
+	DEVICE_KEITHLEY,
+	DEVICE_RIGOL,
+	DEVICE_ARDUINO
+};
+
+std::vector<int> commPorts;
+TripUnitType tripUnitType;
+
+// represents a connection to a device that uses a comm port
+typedef struct _DeviceConnection
+{
+	HANDLE handle;
+	int commPort;
+} DeviceConnection;
+
+DeviceConnection hTripUnit = {INVALID_HANDLE_VALUE, 0};
+DeviceConnection hKeithley = {INVALID_HANDLE_VALUE, 0};
+DeviceConnection hArduino = {INVALID_HANDLE_VALUE, 0};
+
+int TripUnitFTDIIndex = FTDI::NO_FTDI_INDEX;
+bool logData = false;
+
+bool BK_PRECISION_9801_Connected = false;
+bool RIGOL_DG1000Z_Connected = false;
+
+//////////////////////////////////////////////////////////////////////////
+
+// this is just stuff having to do with InputDlgProc()
+
+std::string inputBoxPrompt; // prompt show in the dialog box
+std::unordered_map<std::string, std::string> lastInputValues;
+
+#define InputBox_ReturnValue_Cancel 0
+#define InputBox_ReturnValue_OK 1
+
+int InputBox_ReturnValue;
+float ReturnedInputValue_Float;
+std::string ReturnedInputValue_String;
+
+////////////////////////////////////////////////////////////////////////////
+
+HWND hwndMain = NULL;
+HWND hwndEdit = NULL;
+HWND hwndStatusBar = NULL;
+HWND hwndManualModeDialog = NULL;
+HWND hModelessDlg = NULL;
+
+int ATB_Phase_Selected = -1;
+long double rValue_For_ATB_Phase;
+
+char tu_serial[12] = {0};
+
+std::string database_file;
+
+ACPRO2_RG::ArbitraryCalibrationParams arbitraryRCCalibrationParams;
+ACPRO2_RG::FullCalibrationParams fullRCCalibrationParams;
+
+bool ProductionMode = false;
+
+// we have already made sure this directory exists
+std::string iniFile = "C:\\urc\\apps\\autocal_rc\\autocal_rc.ini";
+
+// global variables
+static std::ofstream log_file;
+bool ArduinoAbortTimingTest = false;
+bool RigolDualChannelMode = false;
 
 // private function prototypes
 bool ProgramTripUnitEEProm(const char *mfg, const char *description);
@@ -56,11 +135,6 @@ static void BuildCurrentVoltageScreen(HANDLE hTripUnit, HWND hDlg);
 static void stepBK9801(HANDLE hTripUnit, HANDLE hKeithley, bool do50hz);
 static void stepRIGOL(HANDLE hTripUnit, HANDLE hKeithley, bool do50hz);
 static void CenterDialog(HWND hwnd);
-
-// global variables
-static std::ofstream log_file;
-bool ArduinoAbortTimingTest = false;
-bool RigolDualChannelMode = false;
 
 static void OpenURL(const char *url)
 {
