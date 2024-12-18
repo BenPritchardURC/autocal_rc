@@ -695,6 +695,9 @@ void GatherRCArbitraryCalParams(HWND hwnd)
 {
 	char tmpBuf[1024] = {0};
 
+	// we'll set it to false if any of the values are invalid
+	arbitraryRCCalibrationParams.valid = true;
+
 	arbitraryRCCalibrationParams.Do_LowGain_Not_HighGain = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_RADIO_LOGAIN));
 	arbitraryRCCalibrationParams.Do_Channel_A = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_CHECK_CHANNEL_A));
 	arbitraryRCCalibrationParams.Do_Channel_B = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_CHECK_CHANNEL_B));
@@ -716,21 +719,34 @@ void GatherRCArbitraryCalParams(HWND hwnd)
 	arbitraryRCCalibrationParams.send_BK9801_Commands = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_CHECK_SEND_BK9801));
 	arbitraryRCCalibrationParams.send_DG1000Z_Commands = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_CHECK_SEND_DG1000z));
 	arbitraryRCCalibrationParams.Use50HZ = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_CHECK_USE50Hz));
+	arbitraryRCCalibrationParams.useRigolDualChannelMode = (BST_CHECKED == IsDlgButtonChecked(hwnd, IDC_CHECK_DUAL_RIGOL));
 
-	arbitraryRCCalibrationParams.valid =
+	bool someChannelsSelected =
 		arbitraryRCCalibrationParams.Do_Channel_A ||
 		arbitraryRCCalibrationParams.Do_Channel_B ||
 		arbitraryRCCalibrationParams.Do_Channel_C ||
 		arbitraryRCCalibrationParams.Do_Channel_N;
 
-	if (!arbitraryRCCalibrationParams.valid)
+	if (!someChannelsSelected)
 	{
 		PrintToScreen("Error: no channels selected");
+		arbitraryRCCalibrationParams.valid = false;
 	}
 
 	GetDlgItemTextA(hwnd, IDC_RIGOL_V, tmpBuf, sizeof(tmpBuf));
 	arbitraryRCCalibrationParams.voltageToCommandRMS = atof(tmpBuf);
-	arbitraryRCCalibrationParams.valid = arbitraryRCCalibrationParams.valid && (arbitraryRCCalibrationParams.voltageToCommandRMS >= 0);
+
+	if (arbitraryRCCalibrationParams.voltageToCommandRMS < 0)
+	{
+		PrintToScreen("Error: invalid voltage");
+		arbitraryRCCalibrationParams.valid = false;
+	}
+
+	if (!arbitraryRCCalibrationParams.send_BK9801_Commands && !arbitraryRCCalibrationParams.send_DG1000Z_Commands)
+	{
+		PrintToScreen("Error: no devices selected");
+		arbitraryRCCalibrationParams.valid = false;
+	}
 }
 
 // populate the dialog box with the values from arbitraryRCCalibrationParams
@@ -766,6 +782,9 @@ void ScatterArbitraryCalParams(const HWND hwnd)
 
 	SendMessage(GetDlgItem(hwnd, IDC_CHECK_USE50Hz), BM_SETCHECK,
 				arbitraryRCCalibrationParams.Use50HZ ? BST_CHECKED : BST_UNCHECKED, 0);
+
+	SendMessage(GetDlgItem(hwnd, IDC_CHECK_DUAL_RIGOL), BM_SETCHECK,
+				arbitraryRCCalibrationParams.useRigolDualChannelMode ? BST_CHECKED : BST_UNCHECKED, 0);
 
 	SetDlgItemTextA(hwnd, IDC_RIGOL_V, std::to_string(arbitraryRCCalibrationParams.voltageToCommandRMS).c_str());
 }
@@ -2433,6 +2452,7 @@ static void DumpCalCommands(ACPRO2_RG::ArbitraryCalibrationParams cal_params)
 	PrintToScreen(Dots(20, "Send BK9801 cmds?") + boolToString(cal_params.send_BK9801_Commands));
 	PrintToScreen(Dots(20, "Use 50hz?") + boolToString(cal_params.Use50HZ));
 	PrintToScreen(Dots(20, "Rigol Volts RMS") + std::to_string(cal_params.voltageToCommandRMS));
+	PrintToScreen(Dots(20, "Rigol Dual Channel?") + boolToString(cal_params.useRigolDualChannelMode));
 
 	std::string tmpString;
 	switch (cal_params.High_Gain_Point)
@@ -2456,7 +2476,7 @@ static void DumpCalCommands(ACPRO2_RG::ArbitraryCalibrationParams cal_params)
 	PrintToScreen(Dots(20, "High Cal Point") + tmpString);
 }
 
-static void DoAsyncArbitraryCal(HANDLE hHandleForTripUnit, HANDLE hKeithley)
+static void __DoAsyncArbitraryCal(HANDLE hHandleForTripUnit, HANDLE hKeithley)
 {
 	int msgboxID;
 
@@ -2529,10 +2549,32 @@ static void DoAsyncArbitraryCal(HANDLE hHandleForTripUnit, HANDLE hKeithley)
 	if (arbitraryRCCalibrationParams.send_DG1000Z_Commands)
 	{
 		PrintToScreen("Commanding Rigol DG1000z to output sine wave");
-		if (!CommandRigolDG100zVoltage(arbitraryRCCalibrationParams.Use50HZ, arbitraryRCCalibrationParams.voltageToCommandRMS))
+
+		if (arbitraryRCCalibrationParams.useRigolDualChannelMode)
 		{
-			PrintToScreen("Error sending command to DG1000z; aborting");
-			return;
+			float tmp_vRMS = arbitraryRCCalibrationParams.voltageToCommandRMS / 2;
+			std::string voltsRMS_as_string = std::to_string(tmp_vRMS);
+
+			// apply 1/2 the voltage to each channel
+			RIGOL_DG1000Z::SetupToApplySINWave(arbitraryRCCalibrationParams.Use50HZ, voltsRMS_as_string);
+			RIGOL_DG1000Z::EnableOutput();
+
+			// apply 1/2 the voltage to each channel
+			RIGOL_DG1000Z::SetupToApplySINWave_2(arbitraryRCCalibrationParams.Use50HZ, voltsRMS_as_string);
+			RIGOL_DG1000Z::EnableOutput_2();
+
+			// now sync the outputs
+			RIGOL_DG1000Z::SendSyncChannels();
+			RIGOL_DG1000Z::SendChannel2Phase180();
+		}
+		else
+		{
+			// just use convienence function
+			if (!CommandRigolDG100zVoltage(arbitraryRCCalibrationParams.Use50HZ, arbitraryRCCalibrationParams.voltageToCommandRMS))
+			{
+				PrintToScreen("Error sending command to DG1000z; aborting");
+				return;
+			}
 		}
 	}
 	else if (arbitraryRCCalibrationParams.send_BK9801_Commands)
@@ -2552,8 +2594,13 @@ static void DoAsyncArbitraryCal(HANDLE hHandleForTripUnit, HANDLE hKeithley)
 		PrintToScreen("aborted");
 
 		if (arbitraryRCCalibrationParams.send_DG1000Z_Commands)
+		{
 			RIGOL_DG1000Z::DisableOutput();
-		else if (arbitraryRCCalibrationParams.send_BK9801_Commands)
+
+			if (arbitraryRCCalibrationParams.useRigolDualChannelMode)
+				RIGOL_DG1000Z::DisableOutput_2();
+		}
+		else
 			BK_PRECISION_9801::DisableOutput();
 
 		return;
@@ -2567,13 +2614,18 @@ static void DoAsyncArbitraryCal(HANDLE hHandleForTripUnit, HANDLE hKeithley)
 
 	if (!KEITHLEY::VoltageOnKeithleyIsStable(hKeithley))
 	{
-
 		PrintToScreen("Keithley voltage not stable enough to proceed; aborted");
 
 		if (arbitraryRCCalibrationParams.send_DG1000Z_Commands)
+		{
 			RIGOL_DG1000Z::DisableOutput();
-		else if (arbitraryRCCalibrationParams.send_BK9801_Commands)
+
+			if (arbitraryRCCalibrationParams.useRigolDualChannelMode)
+				RIGOL_DG1000Z::DisableOutput_2();
+		}
+		else
 			BK_PRECISION_9801::DisableOutput();
+
 		return;
 	}
 
@@ -2677,8 +2729,33 @@ static void DoAsyncArbitraryCal(HANDLE hHandleForTripUnit, HANDLE hKeithley)
 	// TODO: check for valid calibration
 
 	if (arbitraryRCCalibrationParams.send_DG1000Z_Commands)
+	{
 		RIGOL_DG1000Z::DisableOutput();
-	else if (arbitraryRCCalibrationParams.send_BK9801_Commands)
+
+		if (arbitraryRCCalibrationParams.useRigolDualChannelMode)
+			RIGOL_DG1000Z::DisableOutput_2();
+	}
+	else
+		BK_PRECISION_9801::DisableOutput();
+}
+
+static void DoAsyncArbitraryCal(HANDLE hHandleForTripUnit, HANDLE hKeithley)
+{
+
+	// call real function
+	__DoAsyncArbitraryCal(hHandleForTripUnit, hKeithley);
+
+	// redundant code to turn off voltage, no matter what
+	if (arbitraryRCCalibrationParams.send_DG1000Z_Commands)
+	{
+		RIGOL_DG1000Z::DisableOutput();
+
+		if (arbitraryRCCalibrationParams.useRigolDualChannelMode)
+			RIGOL_DG1000Z::DisableOutput_2();
+	}
+	if (arbitraryRCCalibrationParams.send_BK9801_Commands)
+		BK_PRECISION_9801::DisableOutput();
+	else
 		BK_PRECISION_9801::DisableOutput();
 }
 
@@ -2686,6 +2763,8 @@ static void menu_ID_RC_ARBITRARY_CAL()
 {
 	HANDLE hHandleForTripUnit = INVALID_HANDLE_VALUE;
 	int msgboxID;
+
+	/*
 
 	if (INVALID_HANDLE_VALUE == (hHandleForTripUnit = GetHandleForTripUnit()))
 	{
@@ -2695,13 +2774,8 @@ static void menu_ID_RC_ARBITRARY_CAL()
 
 	if (tripUnitType != TripUnitType::AC_PRO2_RC)
 	{
-		msgboxID = MessageBoxA(hwndMain, "Trip Unit is not an AC-PRO-2 RC; click OK to proceed anyway...", "Error", MB_ICONERROR | MB_OKCANCEL);
-		if (msgboxID == IDCANCEL)
-		{
-			PrintToScreen("User cancelled operation");
-			return;
-		}
 		PrintToScreen("Trip Unit is not an AC-PRO-2 RC");
+		return;
 	}
 
 	if (hKeithley.handle == INVALID_HANDLE_VALUE)
@@ -2709,6 +2783,8 @@ static void menu_ID_RC_ARBITRARY_CAL()
 		PrintToScreen("Keithley is not connected");
 		return;
 	}
+
+	*/
 
 	std::thread thread(DoAsyncArbitraryCal, hHandleForTripUnit, hKeithley.handle);
 	thread.detach();

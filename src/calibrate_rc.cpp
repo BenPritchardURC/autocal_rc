@@ -35,6 +35,7 @@ namespace ACPRO2_RG
 		WritePrivateProfileStringA(section.c_str(), "send_DG1000Z_Commands", std::to_string(params.send_DG1000Z_Commands).c_str(), INIFileName.c_str());
 		WritePrivateProfileStringA(section.c_str(), "Use50HZ", std::to_string(params.Use50HZ).c_str(), INIFileName.c_str());
 		WritePrivateProfileStringA(section.c_str(), "voltageToCommandRMS", std::to_string(params.voltageToCommandRMS).c_str(), INIFileName.c_str());
+		WritePrivateProfileStringA(section.c_str(), "useRigolDualChannelMode", std::to_string(params.useRigolDualChannelMode).c_str(), INIFileName.c_str());
 	}
 
 	void ReadArbitraryParamsFromINI(const std::string INIFileName, ArbitraryCalibrationParams &params)
@@ -68,6 +69,9 @@ namespace ACPRO2_RG
 
 		GetPrivateProfileStringA(section.c_str(), "voltageToCommandRMS", "0.5", buffer, sizeof(buffer), INIFileName.c_str());
 		params.voltageToCommandRMS = std::stoi(buffer);
+
+		GetPrivateProfileStringA(section.c_str(), "useRigolDualChannelMode", "0", buffer, sizeof(buffer), INIFileName.c_str());
+		params.useRigolDualChannelMode = std::stoi(buffer);
 	}
 
 	void WriteFullCalibrationParamsToINI(const std::string INIFileName, const FullCalibrationParams &params)
@@ -402,7 +406,7 @@ namespace ACPRO2_RG
 		// cal_file.write("\r\n", 2);
 	}
 
-	static bool CalibrateOneGain(
+	static bool __CalibrateOneGain(
 		HANDLE hTripUnit,
 		HANDLE hKeithley,
 		int GAIN_CONSTANT, const FullCalibrationParams &params, bool Is60hz)
@@ -773,6 +777,28 @@ namespace ACPRO2_RG
 			BK_PRECISION_9801::DisableOutput();
 
 		return retval;
+	}
+
+	static bool CalibrateOneGain(
+		HANDLE hTripUnit,
+		HANDLE hKeithley,
+		int GAIN_CONSTANT, const FullCalibrationParams &params, bool Is60hz)
+	{
+		// call real function
+		bool retval = __CalibrateOneGain(hTripUnit, hKeithley, GAIN_CONSTANT, params, Is60hz);
+
+		// redundant code to turn off voltage, no matter what
+		if (params.use_rigol_dg1000z)
+		{
+			RIGOL_DG1000Z::DisableOutput();
+
+			if (params.useRigolDualChannelMode)
+				RIGOL_DG1000Z::DisableOutput_2();
+		}
+		else
+			BK_PRECISION_9801::DisableOutput();
+
+		return true;
 	}
 
 	static bool CalibrateAllChannels_AtFreq(

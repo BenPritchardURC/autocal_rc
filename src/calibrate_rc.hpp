@@ -40,6 +40,8 @@ namespace ACPRO2_RG
         bool Use50HZ;
         float voltageToCommandRMS;
 
+        bool useRigolDualChannelMode;
+
     } ArbitraryCalibrationParams;
 
     // parameters passed to the routine to do a full calibration: DoFullTripUnitCAL()
